@@ -10,7 +10,10 @@ module.exports = {
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
-      config: {},
+      config: {
+        name: 'portshare',
+        setupExe: 'PortShare-Setup.exe',
+      },
     },
     {
       name: '@electron-forge/maker-zip',
