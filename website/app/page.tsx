@@ -15,7 +15,7 @@ export default function Home() {
     process.env.NEXT_PUBLIC_PORTSHARE_DOMAIN,
     "NEXT_PUBLIC_PORTSHARE_DOMAIN",
   );
-  const desktopDownloadUrl = requiredPublicEnv(
+  requiredPublicEnv(
     process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL,
     "NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL",
   );
@@ -63,7 +63,7 @@ export default function Home() {
           </p>
 
           <div className="hero-actions">
-            <a className="btn btn-primary" href={desktopDownloadUrl}>
+            <a className="btn btn-primary" href="/download/portshare-desktop">
               Download Desktop App
             </a>
             <a className="btn btn-ghost" href="#how-it-works">
@@ -135,7 +135,7 @@ export default function Home() {
 
         <section className="cta-band">
           <h2>Install the desktop client and start tunneling now.</h2>
-          <a className="btn btn-primary" href={desktopDownloadUrl}>
+          <a className="btn btn-primary" href="/download/portshare-desktop">
             Download PortShare Desktop
           </a>
         </section>
