@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root {
+  --brand: #171717;
+  --brand-strong: #000000;
+  --text-strong: #171717;
+  --text-soft: #6b6b6b;
+  --panel-bg: #ffffff;
+  --panel-border: #e5e5e5;
+  --panel-divider: #ededed;
+  --panel-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+  --mono-font: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --sans-font: 'Space Grotesk', 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--sans-font);
+  color: var(--text-strong);
+  background: #ffffff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html[data-theme='dark'] {
+  --text-strong: #ececec;
+  --text-soft: #a7a7a7;
+  --panel-bg: #2b2b2b;
+  --panel-border: #424242;
+  --panel-divider: #414141;
+  --panel-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+
+html[data-theme='dark'] body {
+  background: #212121;
+}
