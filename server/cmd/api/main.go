@@ -24,7 +24,14 @@ func main() {
 	config := cors.DefaultConfig()
 	config.AllowOrigins = configuredOrigins()
 	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept"}
-	r.Use(cors.New(config))
+	corsMiddleware := cors.New(config)
+	r.Use(func(c *gin.Context) {
+		if strings.EqualFold(c.GetHeader("Upgrade"), "websocket") {
+			c.Next()
+			return
+		}
+		corsMiddleware(c)
+	})
 
 	routes.SubdomainRoutes(r)
 	routes.AuthRoutes(r)
