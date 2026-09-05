@@ -17,7 +17,7 @@ const createWindow = () => {
   });
 
   const rendererPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'frontend', 'dist', 'index.html')
+    ? path.join(process.resourcesPath, 'dist', 'index.html')
     : path.join(__dirname, '../../frontend/dist/index.html');
 
   // Use the production Vite bundle when available; Forge's fallback keeps dev startup usable.
