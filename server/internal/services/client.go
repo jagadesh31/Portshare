@@ -17,10 +17,14 @@ import (
 )
 
 type clientRecord struct {
-	ID           string `json:"id"`
-	Subdomain    string `json:"subdomain,omitempty"`
-	CustomDomain string `json:"customDomain,omitempty"`
-	Port         *int   `json:"port"`
+	ID             string `json:"id"`
+	Subdomain      string `json:"subdomain,omitempty"`
+	CustomDomain   string `json:"customDomain,omitempty"`
+	Port           *int   `json:"port"`
+	RequireAuth    bool   `json:"requireAuth"`
+	Plan           string `json:"plan"`
+	BandwidthUsed  int64  `json:"bandwidthUsed"`
+	BandwidthLimit int64  `json:"bandwidthLimit"`
 }
 
 var clientStore = struct {
@@ -53,12 +57,21 @@ func LoadClientStore() error {
 			id TEXT PRIMARY KEY,
 			subdomain TEXT UNIQUE,
 			custom_domain TEXT UNIQUE,
-			port INTEGER
+			port INTEGER,
+			require_auth BOOLEAN NOT NULL DEFAULT FALSE,
+			plan TEXT NOT NULL DEFAULT 'free',
+			bandwidth_used BIGINT NOT NULL DEFAULT 0,
+			bandwidth_limit BIGINT NOT NULL DEFAULT 1073741824
 		)`); err != nil {
 		_ = database.Close()
 		return err
 	}
-	rows, err := database.Query("SELECT id, subdomain, custom_domain, port FROM clients")
+	// Migrate: add column if upgrading from an older schema.
+	_, _ = database.Exec(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS require_auth BOOLEAN NOT NULL DEFAULT FALSE`)
+	_, _ = database.Exec(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'free'`)
+	_, _ = database.Exec(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS bandwidth_used BIGINT NOT NULL DEFAULT 0`)
+	_, _ = database.Exec(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS bandwidth_limit BIGINT NOT NULL DEFAULT 1073741824`)
+	rows, err := database.Query("SELECT id, subdomain, custom_domain, port, require_auth, plan, bandwidth_used, bandwidth_limit FROM clients")
 	if err != nil {
 		_ = database.Close()
 		return err
@@ -72,7 +85,7 @@ func LoadClientStore() error {
 		var client clientRecord
 		var subdomain, customDomain sql.NullString
 		var port sql.NullInt64
-		if err := rows.Scan(&client.ID, &subdomain, &customDomain, &port); err != nil {
+		if err := rows.Scan(&client.ID, &subdomain, &customDomain, &port, &client.RequireAuth, &client.Plan, &client.BandwidthUsed, &client.BandwidthLimit); err != nil {
 			_ = database.Close()
 			return err
 		}
@@ -122,8 +135,8 @@ func persistLocked() {
 			port = *client.Port
 		}
 		if _, err := tx.Exec(
-			"INSERT INTO clients (id, subdomain, custom_domain, port) VALUES ($1, NULLIF($2, ''), NULLIF($3, ''), $4)",
-			client.ID, client.Subdomain, client.CustomDomain, port,
+			"INSERT INTO clients (id, subdomain, custom_domain, port, require_auth, plan, bandwidth_used, bandwidth_limit) VALUES ($1, NULLIF($2, ''), NULLIF($3, ''), $4, $5, $6, $7, $8)",
+			client.ID, client.Subdomain, client.CustomDomain, port, client.RequireAuth, client.Plan, client.BandwidthUsed, client.BandwidthLimit,
 		); err != nil {
 			_ = tx.Rollback()
 			return
@@ -146,10 +159,31 @@ func EnsureClientIdentity(c *gin.Context) {
 		}
 	}
 	id := newClientID()
-	client := &clientRecord{ID: id}
+	client := &clientRecord{
+		ID:             id,
+		Plan:           "free",
+		BandwidthLimit: 1073741824, // 1GB
+	}
 	clientStore.clients[id] = client
 	persistLocked()
 	c.JSON(http.StatusCreated, client)
+}
+
+// RecordBandwidth increments the bandwidth counter for a client in memory and DB.
+func RecordBandwidth(clientID string, bytes int64) {
+	if bytes == 0 {
+		return
+	}
+	clientStore.Lock()
+	client, ok := clientStore.clients[clientID]
+	if ok {
+		client.BandwidthUsed += bytes
+	}
+	clientStore.Unlock()
+
+	if clientDatabase != nil {
+		_, _ = clientDatabase.Exec("UPDATE clients SET bandwidth_used = bandwidth_used + $1 WHERE id = $2", bytes, clientID)
+	}
 }
 
 func UpdateClientPort(c *gin.Context) {
@@ -171,6 +205,28 @@ func UpdateClientPort(c *gin.Context) {
 	client.Port = &input.Port
 	persistLocked()
 	c.JSON(http.StatusOK, client)
+}
+
+// UpdateClientAuth toggles the Google Auth wall for a client's tunnel.
+func UpdateClientAuth(c *gin.Context) {
+	var input struct {
+		ClientID    string `json:"clientId"`
+		RequireAuth bool   `json:"requireAuth"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil || input.ClientID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "clientId is required"})
+		return
+	}
+	clientStore.Lock()
+	defer clientStore.Unlock()
+	client, found := clientStore.clients[input.ClientID]
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"message": "client identity not found"})
+		return
+	}
+	client.RequireAuth = input.RequireAuth
+	persistLocked()
+	c.JSON(http.StatusOK, gin.H{"requireAuth": client.RequireAuth, "gauthEnabled": GAuthEnabled()})
 }
 
 func UpdateClientDomain(c *gin.Context) {

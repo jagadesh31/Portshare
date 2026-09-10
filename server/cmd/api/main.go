@@ -36,6 +36,7 @@ func main() {
 	routes.SubdomainRoutes(r)
 	routes.AuthRoutes(r)
 	routes.ClientRoutes(r)
+	routes.BillingRoutes(r)
 	r.GET("/tunnel/connect", services.ConnectTunnel)
 
 	r.GET("/health", func(ctx *gin.Context) {

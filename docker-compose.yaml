@@ -24,6 +24,11 @@ services:
       PORTSHARE_ROOT_DOMAIN: ${PORTSHARE_ROOT_DOMAIN:?PORTSHARE_ROOT_DOMAIN is required}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
       PORT: 9080
+      # Google OAuth — optional, leave empty to disable the auth wall feature
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_CALLBACK_URL: ${GOOGLE_OAUTH_CALLBACK_URL:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
     depends_on:
       db:
         condition: service_healthy

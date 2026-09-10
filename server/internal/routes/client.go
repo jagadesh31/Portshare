@@ -11,4 +11,6 @@ func ClientRoutes(r *gin.Engine) {
 	client.POST("/identity", services.EnsureClientIdentity)
 	client.PUT("/port", services.UpdateClientPort)
 	client.PUT("/domain", services.UpdateClientDomain)
+	client.PUT("/auth", services.UpdateClientAuth)
+	client.GET("/stats", services.GetClientStats)
 }

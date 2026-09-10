@@ -1,12 +1,17 @@
 package routes
 
-import "github.com/gin-gonic/gin"
+import (
+	"server/internal/services"
+
+	"github.com/gin-gonic/gin"
+)
 
 func AuthRoutes(r *gin.Engine) {
 	auth := r.Group("/auth")
-	auth.GET("/", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"message": "Hello from Auth Route",
-		})
-	})
+
+	// Google OAuth2 flow
+	auth.GET("/google/login", services.GoogleLoginHandler)
+	auth.GET("/google/callback", services.GoogleCallbackHandler)
+	auth.GET("/google/logout", services.GoogleLogoutHandler)
+	auth.GET("/google/status", services.GAuthStatusHandler)
 }

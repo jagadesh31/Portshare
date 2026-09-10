@@ -59,6 +59,58 @@ var tunnelStore = struct {
 	pending     map[string]chan tunnelResponse
 }{connections: make(map[string]*tunnelConnection), pending: make(map[string]chan tunnelResponse)}
 
+// clientStats tracks per-client request counters.
+type clientStats struct {
+	TotalRequests int64            `json:"totalRequests"`
+	StatusCounts  map[string]int64 `json:"statusCounts"`
+	BytesIn       int64            `json:"bytesIn"`
+	BytesOut      int64            `json:"bytesOut"`
+}
+
+var statsStore = struct {
+	sync.RWMutex
+	data map[string]*clientStats
+}{data: make(map[string]*clientStats)}
+
+// recordRequestStats updates the in-memory stats for a client.
+func recordRequestStats(clientID string, status int, bytesIn, bytesOut int64) {
+	statsStore.Lock()
+	defer statsStore.Unlock()
+	s, ok := statsStore.data[clientID]
+	if !ok {
+		s = &clientStats{StatusCounts: make(map[string]int64)}
+		statsStore.data[clientID] = s
+	}
+	s.TotalRequests++
+	s.BytesIn += bytesIn
+	s.BytesOut += bytesOut
+	bucket := fmt.Sprintf("%dxx", status/100)
+	s.StatusCounts[bucket]++
+
+	// Persist bandwidth to database
+	RecordBandwidth(clientID, bytesIn+bytesOut)
+}
+
+// GetClientStats returns JSON stats for a given clientId query param.
+func GetClientStats(c *gin.Context) {
+	clientID := strings.TrimSpace(c.Query("clientId"))
+	if clientID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "clientId is required"})
+		return
+	}
+	statsStore.RLock()
+	s, ok := statsStore.data[clientID]
+	statsStore.RUnlock()
+	if !ok {
+		// Return zeroed stats for clients with no traffic yet.
+		c.JSON(http.StatusOK, clientStats{StatusCounts: make(map[string]int64)})
+		return
+	}
+	statsStore.RLock()
+	defer statsStore.RUnlock()
+	c.JSON(http.StatusOK, s)
+}
+
 var tunnelUpgrader = websocket.Upgrader{
 	ReadBufferSize:  16 << 10,
 	WriteBufferSize: 16 << 10,
@@ -145,6 +197,31 @@ func HandlePublicTunnel(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"message": "desktop tunnel is offline"})
 		return
 	}
+	// Google Auth wall — redirects unauthenticated visitors if the client has
+	// requireAuth enabled. No-op when GAuth is not configured server-side.
+	if !RequireGAuth(c, clientID) {
+		return
+	}
+
+	// Bandwidth Limit Check
+	clientStore.RLock()
+	clientRecord := clientStore.clients[clientID]
+	isOverLimit := clientRecord != nil && clientRecord.BandwidthUsed >= clientRecord.BandwidthLimit
+	clientStore.RUnlock()
+
+	if isOverLimit {
+		c.Data(http.StatusPaymentRequired, "text/html", []byte(`
+			<!DOCTYPE html>
+			<html><head><title>Bandwidth Limit Reached</title>
+			<style>body { font-family: sans-serif; text-align: center; padding: 4rem; background: #fafafa; color: #333; } h1 { color: #e11d48; } .btn { display: inline-block; padding: 12px 24px; background: #0ea5e9; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 1rem; }</style>
+			</head><body>
+			<h1>Bandwidth Limit Reached</h1>
+			<p>This PortShare tunnel has exceeded its monthly bandwidth limit.</p>
+			<p>The tunnel owner needs to upgrade to a Pro plan to continue receiving traffic.</p>
+			</body></html>
+		`))
+		return
+	}
 	body, err := io.ReadAll(io.LimitReader(c.Request.Body, maxTunnelBody+1))
 	if err != nil || len(body) > maxTunnelBody {
 		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"message": "request body is too large"})
@@ -170,6 +247,7 @@ func HandlePublicTunnel(c *gin.Context) {
 	select {
 	case response := <-responseChannel:
 		if response.Error != "" {
+			recordRequestStats(clientID, http.StatusBadGateway, int64(len(body)), 0)
 			c.JSON(http.StatusBadGateway, gin.H{"message": response.Error})
 			return
 		}
@@ -180,11 +258,14 @@ func HandlePublicTunnel(c *gin.Context) {
 		}
 		decoded, decodeErr := base64.StdEncoding.DecodeString(response.Body)
 		if decodeErr != nil {
+			recordRequestStats(clientID, http.StatusBadGateway, int64(len(body)), 0)
 			c.JSON(http.StatusBadGateway, gin.H{"message": "invalid tunnel response"})
 			return
 		}
+		recordRequestStats(clientID, response.Status, int64(len(body)), int64(len(decoded)))
 		c.Data(response.Status, "application/octet-stream", decoded)
 	case <-time.After(60 * time.Second):
+		recordRequestStats(clientID, http.StatusGatewayTimeout, int64(len(body)), 0)
 		c.JSON(http.StatusGatewayTimeout, gin.H{"message": "desktop tunnel response timed out"})
 	}
 }

@@ -13,9 +13,23 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PortShare | Desktop Tunnel Client",
+  title: "PortShare — Expose localhost with a public URL in seconds",
   description:
-    "Expose localhost to the internet with managed subdomains from your own domain.",
+    "PortShare is a fast, developer-first tunnel client. Get a permanent public subdomain for your local dev server in seconds. Custom domains, webhook inspector, zero friction.",
+  keywords: [
+    "localhost tunnel",
+    "ngrok alternative",
+    "port forwarding",
+    "local to public URL",
+    "webhook testing",
+    "developer tools",
+  ],
+  openGraph: {
+    title: "PortShare — Expose localhost with a public URL in seconds",
+    description:
+      "Fast, developer-first tunnel client. Permanent subdomains, custom domains, webhook inspector.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
@@ -24,11 +38,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body>{children}</body>
     </html>
   );
 }
