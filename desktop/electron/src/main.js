@@ -11,17 +11,19 @@ const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
+    autoHideMenuBar: true,
     webPreferences: {
-      preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
+      nodeIntegration: false,
+      contextIsolation: true,
     },
   });
+  mainWindow.setMenu(null);
 
   const rendererPath = app.isPackaged
     ? path.join(process.resourcesPath, 'dist', 'index.html')
     : path.join(__dirname, '../../frontend/dist/index.html');
 
-  // Use the production Vite bundle when available; Forge's fallback keeps dev startup usable.
-  mainWindow.loadFile(rendererPath).catch(() => mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY));
+  mainWindow.loadFile(rendererPath).catch(e => console.error("Failed to load file:", e));
 
   if (!app.isPackaged && process.env.PORTSHARE_DEVTOOLS === 'true') {
     mainWindow.webContents.openDevTools();
