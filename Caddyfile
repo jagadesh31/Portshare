@@ -1,0 +1,19 @@
+# Caddyfile
+# This configuration handles automatic Let's Encrypt SSL for the main domain and all subdomains.
+
+# 1. Marketing Website (Next.js)
+portshare.kexoz.dev {
+    # Assuming your Next.js app runs on port 3000 locally
+    reverse_proxy localhost:3000
+}
+
+# 2. API & Tunnel Server (Go)
+# This handles the root API and ALL wildcard subdomains
+api.portshare.kexoz.dev, *.portshare.kexoz.dev {
+    # Route all traffic to the Go server running on port 9080
+    reverse_proxy localhost:9080 {
+        # Ensure WebSocket headers are passed through properly for the tunnel
+        header_up X-Real-IP {remote_host}
+        header_up Host {host}
+    }
+}

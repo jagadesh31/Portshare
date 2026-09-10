@@ -187,6 +187,10 @@ func ConnectTunnel(c *gin.Context) {
 func HandlePublicTunnel(c *gin.Context) {
 	clientID := clientForHost(c.Request.Host)
 	if clientID == "" {
+		if strings.Contains(c.GetHeader("Accept"), "text/html") {
+			c.Redirect(http.StatusFound, "https://"+os.Getenv("PORTSHARE_ROOT_DOMAIN"))
+			return
+		}
 		c.JSON(http.StatusNotFound, gin.H{"message": "tunnel host is not configured"})
 		return
 	}
@@ -194,9 +198,84 @@ func HandlePublicTunnel(c *gin.Context) {
 	connection := tunnelStore.connections[clientID]
 	tunnelStore.RUnlock()
 	if connection == nil {
+		if strings.Contains(c.GetHeader("Accept"), "text/html") {
+			c.Data(http.StatusBadGateway, "text/html; charset=utf-8", []byte(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tunnel Offline - PortShare</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #09090b; color: #f0f0f2; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: #13131a; border: 1px solid rgba(139, 92, 246, 0.15); padding: 40px; border-radius: 16px; text-align: center; max-width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+        h1 { margin: 0 0 16px; font-size: 24px; color: #ffffff; }
+        p { color: #8a8a96; line-height: 1.5; margin-bottom: 24px; }
+        a { display: inline-block; background: #8b5cf6; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; transition: background 0.2s; }
+        a:hover { background: #7c3aed; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Tunnel is Offline</h1>
+        <p>The developer's local environment is currently disconnected. Please try again later.</p>
+        <a href="https://`+os.Getenv("PORTSHARE_ROOT_DOMAIN")+`">Get your own PortShare tunnel</a>
+    </div>
+</body>
+</html>`))
+			return
+		}
 		c.JSON(http.StatusBadGateway, gin.H{"message": "desktop tunnel is offline"})
 		return
 	}
+
+	// Interstitial Warning Page to prevent automated phishing scanners from flagging the domain.
+	if strings.Contains(c.GetHeader("Accept"), "text/html") {
+		if _, err := c.Cookie("portshare_interstitial_accepted"); err != nil {
+			if c.Request.Method == http.MethodPost && c.PostForm("action") == "continue" {
+				c.SetCookie("portshare_interstitial_accepted", "1", 3600*24*30, "/", "", true, true)
+				c.Redirect(http.StatusFound, c.Request.URL.String())
+				return
+			}
+			
+			c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Warning - PortShare</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #09090b; color: #f0f0f2; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: #13131a; border: 1px solid rgba(239, 68, 68, 0.2); padding: 40px; border-radius: 16px; text-align: center; max-width: 450px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+        h1 { margin: 0 0 16px; font-size: 22px; color: #ffffff; }
+        p { color: #8a8a96; line-height: 1.6; margin-bottom: 24px; font-size: 15px; }
+        .btn { display: inline-block; background: #ef4444; color: #ffffff; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background 0.2s; width: 100%; font-size: 15px; }
+        .btn:hover { background: #dc2626; }
+        .muted { margin-top: 20px; font-size: 12px; color: #6b6b78; }
+        .muted a { color: #8b5cf6; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 16px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        <h1>You are about to visit a PortShare Tunnel</h1>
+        <p>This URL is served by a local developer's computer via PortShare. This content is user-generated and not vetted by PortShare.</p>
+        <p><b>Only proceed if you trust the person who sent you this link.</b></p>
+        <form method="POST">
+            <input type="hidden" name="action" value="continue">
+            <button type="submit" class="btn">I understand, continue to website</button>
+        </form>
+        <div class="muted">
+            Is this a malicious site? <a href="https://`+os.Getenv("PORTSHARE_ROOT_DOMAIN")+`">Report Abuse</a>
+        </div>
+    </div>
+</body>
+</html>`))
+			return
+		}
+	}
+
 	// Google Auth wall — redirects unauthenticated visitors if the client has
 	// requireAuth enabled. No-op when GAuth is not configured server-side.
 	if !RequireGAuth(c, clientID) {
