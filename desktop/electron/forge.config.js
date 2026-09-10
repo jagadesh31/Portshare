@@ -73,7 +73,7 @@ module.exports = {
           name: 'Portshare'
         },
         prerelease: false,
-        draft: true
+        draft: false
       }
     }
   ]
