@@ -36,15 +36,13 @@ jobs:
         working-directory: desktop/electron
         run: npm ci
 
-      - name: Package and Publish
+      - name: Build Installer
         working-directory: desktop/electron
-        run: npm run publish
+        run: npm run make
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: desktop/electron/out/make/squirrel.windows/x64/PortShare-Setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Verify release asset
-        run: |
-          echo "Checking release for tag ${{ github.ref_name }}..."
-          gh release view ${{ github.ref_name }} --repo ${{ github.repository }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
