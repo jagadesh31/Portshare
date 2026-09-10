@@ -12,33 +12,36 @@ export default function TerminalMockup({ samplePort, sampleUrl }: { samplePort: 
         <span className="terminal-dot red" />
         <span className="terminal-dot yellow" />
         <span className="terminal-dot green" />
-        <p className="terminal-title">portshare — tunnel</p>
+        <p className="terminal-title">portshare</p>
       </div>
 
       <div className="terminal-line">
-        <span className="term-prompt">$</span>
+        <span className="term-prompt">❯</span>
         <span className="term-cmd">portshare connect --port {samplePort}</span>
       </div>
+      <br/>
       <div className="terminal-line">
-        <span className="term-dim">→</span>
-        <span className="term-dim">Connecting to PortShare server...</span>
+        <span className="term-dim">Starting PortShare client...</span>
       </div>
       <div className="terminal-line">
-        <span className="term-status-ok"><Check size={14} className="inline-icon" /></span>
-        <span className="term-dim">Tunnel established</span>
+        <span className="term-dim">Connected to server</span>
       </div>
       <div className="terminal-line">
-        <span className="term-dim">  Public URL</span>
-        <span className="term-arrow">→</span>
+        <span className="term-dim">Tunnel established!</span>
+      </div>
+      <br/>
+      <div className="terminal-line">
+        <span className="term-cmd">Public URL:</span>
         <span className="term-url">{sampleUrl}</span>
       </div>
       <div className="terminal-line">
-        <span className="term-dim">  Forwarding</span>
+        <span className="term-cmd">Forwarding</span>
         <span className="term-arrow">→</span>
         <span className="term-local">http://localhost:{samplePort}</span>
       </div>
+      <br/>
       <div className="terminal-line">
-        <span className="term-dim">  Press Ctrl+C to stop</span>
+        <span className="term-dim">Press Ctrl+C to stop</span>
         {mounted && <span className="term-cursor" />}
       </div>
     </div>
