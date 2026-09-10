@@ -5,8 +5,10 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -173,6 +175,10 @@ func ConnectTunnel(c *gin.Context) {
 	for {
 		var response tunnelResponse
 		if err := conn.ReadJSON(&response); err != nil {
+			// Ignore expected disconnects (client closed app, network drop, TCP reset).
+			if !isExpectedWSClose(err) {
+				log.Printf("[tunnel] unexpected read error for client %s: %v", clientID, err)
+			}
 			return
 		}
 		tunnelStore.Lock()
@@ -185,6 +191,38 @@ func ConnectTunnel(c *gin.Context) {
 			pending <- response
 		}
 	}
+}
+
+// isExpectedWSClose returns true for errors that are normal client-disconnect
+// scenarios: clean WebSocket close frames, TCP resets, EOF, or I/O timeouts.
+func isExpectedWSClose(err error) bool {
+	if websocket.IsCloseError(err,
+		websocket.CloseNormalClosure,
+		websocket.CloseGoingAway,
+		websocket.CloseAbnormalClosure,
+		websocket.CloseNoStatusReceived,
+	) {
+		return true
+	}
+	// io.EOF / io.ErrUnexpectedEOF — pipe closed
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	msg := err.Error()
+	// Windows TCP reset: "wsarecv: An existing connection was forcibly closed"
+	// Linux equivalent: "connection reset by peer" / "broken pipe"
+	for _, fragment := range []string{
+		"forcibly closed",
+		"connection reset by peer",
+		"broken pipe",
+		"use of closed network connection",
+		"i/o timeout",
+	} {
+		if strings.Contains(msg, fragment) {
+			return true
+		}
+	}
+	return false
 }
 
 func HandlePublicTunnel(c *gin.Context) {
