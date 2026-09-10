@@ -1,5 +1,4 @@
 import TerminalMockup from "./TerminalMockup";
-import BadgesRow from "./BadgesRow";
 
 export default function HeroSection({ publicDomain, sampleSubdomain, samplePort }: { publicDomain: string, sampleSubdomain: string, samplePort: string }) {
   const sampleUrl = `https://${sampleSubdomain}.${publicDomain}`;
@@ -39,10 +38,6 @@ export default function HeroSection({ publicDomain, sampleSubdomain, samplePort 
 
       <div className="hero-visual">
         <TerminalMockup samplePort={samplePort} sampleUrl={sampleUrl} />
-      </div>
-      
-      <div className="hero-badges-wrapper">
-        <BadgesRow />
       </div>
     </section>
   );

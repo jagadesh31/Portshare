@@ -2,14 +2,14 @@ import SectionHeader from "../ui/SectionHeader";
 
 export default function HowItWorks({ sampleSubdomain, publicDomain }: { sampleSubdomain: string, publicDomain: string }) {
   return (
-    <>
+    <section id="how-it-works-section">
       <SectionHeader 
         id="how-it-works"
         eyebrow="How it works"
         title="Up and running in 30 seconds"
         description="Three simple steps from install to public URL. No DNS wrangling, no YAML, no tears."
       />
-      <section className="flow-grid">
+      <div className="flow-grid" style={{ marginTop: '40px' }}>
         {[
           {
             step: "01",
@@ -33,7 +33,7 @@ export default function HowItWorks({ sampleSubdomain, publicDomain }: { sampleSu
             <p>{card.body}</p>
           </article>
         ))}
-      </section>
-    </>
+      </div>
+    </section>
   );
 }

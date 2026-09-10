@@ -3,20 +3,20 @@
 
 /* ─── DESIGN TOKENS ─────────────────────────────────── */
 :root {
-  --bg:            #fafafa;
-  --bg-surface:    #ffffff;
-  --bg-card:       #f9fafb;
-  --bg-card-hover: #f3f4f6;
-  --border:        rgba(0, 0, 0, 0.06);
-  --border-bright: rgba(0, 0, 0, 0.12);
-  --accent:        #111827; /* Dark black/grey */
-  --accent-dim:    rgba(0, 0, 0, 0.04);
-  --accent-glow:   rgba(0, 0, 0, 0.05);
-  --accent-cyan:   #06b6d4;
-  --accent-green:  #10b981;
-  --text:          #111827;
-  --text-muted:    #4b5563;
-  --text-soft:     #6b7280;
+  --bg:            #000000;
+  --bg-surface:    #0a0a0a;
+  --bg-card:       #111111;
+  --bg-card-hover: #1a1a1a;
+  --border:        rgba(255, 255, 255, 0.1);
+  --border-bright: rgba(255, 255, 255, 0.2);
+  --accent:        #ffffff;
+  --accent-dim:    rgba(255, 255, 255, 0.05);
+  --accent-glow:   rgba(255, 255, 255, 0.1);
+  --accent-cyan:   #22d3ee;
+  --accent-green:  #34d399;
+  --text:          #ffffff;
+  --text-muted:    #a1a1aa;
+  --text-soft:     #71717a;
   --mono:          'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
   --sans:          'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --radius:        16px;
@@ -52,7 +52,7 @@ body::before {
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 800px;
-  background-image: radial-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
   background-size: 24px 24px;
   mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
   -webkit-mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
@@ -73,8 +73,10 @@ body::before {
   padding: 0 28px 100px;
   position: relative;
   z-index: 1;
-  display: grid;
-  gap: 64px;
+}
+
+section {
+  margin-bottom: 120px;
 }
 
 /* ─── HEADER ─────────────────────────────────────────── */
@@ -138,13 +140,13 @@ body::before {
 
 .btn-primary {
   background: var(--accent);
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  color: #000;
+  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.15);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.2);
 }
 
 .btn-ghost {
@@ -160,7 +162,8 @@ body::before {
 
 /* ─── HERO ───────────────────────────────────────────── */
 .hero-block {
-  padding: 80px 0 60px;
+  padding: 40px 0 0 0;
+  margin-bottom: 80px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 40px;
@@ -224,7 +227,7 @@ body::before {
   line-height: 1.05;
   letter-spacing: -0.04em;
   color: var(--text);
-  max-width: 15ch;
+  max-width: 20ch;
 }
 
 .hero-copy {

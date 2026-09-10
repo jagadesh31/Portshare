@@ -3,14 +3,14 @@ import SectionHeader from "../ui/SectionHeader";
 
 export default function FeaturesGrid({ publicDomain }: { publicDomain: string }) {
   return (
-    <>
+    <section id="features-section">
       <SectionHeader 
         id="features"
         eyebrow="Features"
         title="Everything you need, nothing you don't"
         description="Built by developers for developers — every feature is designed to reduce friction."
       />
-      <section className="features-grid">
+      <div className="features-grid" style={{ marginTop: '40px' }}>
         {[
           {
             icon: <Search size={24} />,
@@ -44,7 +44,7 @@ export default function FeaturesGrid({ publicDomain }: { publicDomain: string })
             <p>{f.body}</p>
           </article>
         ))}
-      </section>
-    </>
+      </div>
+    </section>
   );
 }

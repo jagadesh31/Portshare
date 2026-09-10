@@ -1,12 +1,15 @@
 package services
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/http/httputil"
 	"os"
 	"strings"
 	"sync"
@@ -197,7 +200,12 @@ func HandlePublicTunnel(c *gin.Context) {
 	tunnelStore.RLock()
 	connection := tunnelStore.connections[clientID]
 	tunnelStore.RUnlock()
-	if connection == nil {
+
+	sshStore.RLock()
+	sshConnection := sshStore.connections[clientID]
+	sshStore.RUnlock()
+
+	if connection == nil && sshConnection == nil {
 		if strings.Contains(c.GetHeader("Accept"), "text/html") {
 			c.Data(http.StatusBadGateway, "text/html; charset=utf-8", []byte(`
 <!DOCTYPE html>
@@ -228,6 +236,23 @@ func HandlePublicTunnel(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"message": "desktop tunnel is offline"})
 		return
 	}
+
+	if sshConnection != nil {
+		proxy := &httputil.ReverseProxy{
+			Director: func(req *http.Request) {
+				req.URL.Scheme = "http"
+				req.URL.Host = "localhost"
+			},
+			Transport: &http.Transport{
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					return openSSHChannel(sshConnection)
+				},
+			},
+		}
+		proxy.ServeHTTP(c.Writer, c.Request)
+		return
+	}
+
 
 	// Interstitial Warning Page to prevent automated phishing scanners from flagging the domain.
 	if strings.Contains(c.GetHeader("Accept"), "text/html") {

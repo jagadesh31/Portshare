@@ -14,14 +14,14 @@ const comparisonData = [
 
 export default function ComparisonTable() {
   return (
-    <>
+    <section id="comparison-section">
       <SectionHeader 
         id="compare"
         eyebrow="Compare"
         title="Why choose PortShare?"
         description="See how we stack up against the established alternatives."
       />
-      <section className="comparison-section">
+      <div className="comparison-section" style={{ marginTop: '40px' }}>
         <div className="table-container">
           <table className="comparison-table">
             <thead>
@@ -44,7 +44,7 @@ export default function ComparisonTable() {
             </tbody>
           </table>
         </div>
-      </section>
-    </>
+      </div>
+    </section>
   );
 }

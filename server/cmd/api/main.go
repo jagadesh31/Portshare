@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"server/internal/routes"
 	"server/internal/services"
@@ -53,6 +54,22 @@ func main() {
 	if !strings.HasPrefix(port, ":") {
 		port = ":" + port
 	}
+
+	go func() {
+		sshPort := os.Getenv("SSH_PORT")
+		if sshPort == "" {
+			sshPort = ":2222"
+		}
+		if !strings.HasPrefix(sshPort, ":") {
+			sshPort = ":" + sshPort
+		}
+		fmt.Println("Starting SSH Server on", sshPort)
+		if err := services.StartSSHServer(sshPort); err != nil {
+			fmt.Println("SSH Server failed:", err)
+		}
+	}()
+
+	fmt.Println("Starting HTTP Server on", port)
 	if err := r.Run(port); err != nil {
 		panic(err)
 	}
