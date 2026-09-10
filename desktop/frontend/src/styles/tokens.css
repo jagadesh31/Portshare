@@ -1,0 +1,34 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* ── DESIGN TOKENS ─────────────────────────────────────── */
+:root {
+  --bg:          #0a0a0b;
+  --bg-surface:  #111113;
+  --bg-card:     #141417;
+  --bg-input:    #111113;
+  --panel-bg:    #111113;
+  --panel-border: #26262a;
+  --panel-divider: #26262a;
+  --panel-shadow: 0 24px 48px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--panel-border) inset;
+
+  --accent:      #e2e2e4;
+  --accent-dim:  rgba(226, 226, 228, 0.1);
+  --accent-glow: rgba(226, 226, 228, 0.15);
+  --accent-cyan: #5b5b66;
+  --accent-red:  #ef4444;
+  --accent-yellow: #f59e0b;
+
+  --text:        #ededef;
+  --text-strong: #ffffff;
+  --text-muted:  #a0a0a5;
+  --text-soft:   #808086;
+
+  --brand:       #e2e2e4;
+  --brand-strong: #ffffff;
+
+  --radius:      12px;
+  --radius-sm:   8px;
+
+  --mono-font:   'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
+  --sans-font:   'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
