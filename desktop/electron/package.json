@@ -1,7 +1,7 @@
 {
   "name": "portshare",
   "productName": "PortShare",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "My Electron application description",
   "main": "src/main.js",
   "private": true,
