@@ -11,9 +11,6 @@ permissions:
 jobs:
   build-and-release:
     runs-on: windows-latest
-    env:
-      VITE_PORTSHARE_API_BASE: "https://portshare.kexoz.dev"
-      VITE_PORTSHARE_ROOT_DOMAIN: "portshare.kexoz.dev"
     
     steps:
       - name: Checkout Code
@@ -31,19 +28,17 @@ jobs:
       - name: Build Frontend
         working-directory: desktop/frontend
         run: npm run build
+        env:
+          VITE_PORTSHARE_API_BASE: "https://api.portshare.kexoz.dev"
+          VITE_PORTSHARE_ROOT_DOMAIN: "portshare.kexoz.dev"
 
       - name: Install Electron Dependencies
         working-directory: desktop/electron
         run: npm ci
 
-      - name: Build Installer
+      - name: Package and Publish
         working-directory: desktop/electron
-        run: npm run make
-
-      - name: Upload Release Asset
-        uses: softprops/action-gh-release@v1
-        with:
-          files: desktop/electron/out/make/squirrel.windows/x64/PortShare-Setup.exe
+        run: npm run publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
