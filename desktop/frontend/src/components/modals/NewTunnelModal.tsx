@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, ChevronDown } from 'lucide-react'
+import { X } from 'lucide-react'
 import { QUICK_PORTS } from '../../lib/storage'
 
 type Props = {

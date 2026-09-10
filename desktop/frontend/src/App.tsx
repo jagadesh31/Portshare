@@ -3,7 +3,7 @@ import './styles/base.css'
 import './styles/animations.css'
 
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence } from 'motion/react'
+
 import { Toaster, toast } from 'react-hot-toast'
 import axios from 'axios'
 
@@ -50,7 +50,7 @@ export default function App() {
   const [gauthEnabled, setGauthEnabled] = useState(false)
 
   const { theme, toggleTheme } = useTheme()
-  const { requestLog, totalRequests, logBodyRef, addLogEntry, clearLog } = useRequestLog()
+  const { requestLog, totalRequests, addLogEntry, clearLog } = useRequestLog()
 
   const tunnelPort = useRef<number | null>(null)
   const tunnelClose = useRef<(() => void) | null>(null)
@@ -274,16 +274,15 @@ export default function App() {
                 setPortInput={setPortInput}
                 onPortSubmit={handlePortSubmit}
                 isBusy={isBusy}
-                totalRequests={totalRequests}
                 onCopyUrl={handleCopyUrl}
                 copyFeedback={copyFeedback}
+                onNewTunnel={() => setActivePage('dashboard')}
               />
             )}
 
             {activePage === 'requests' && (
               <RequestsPage
                 requestLog={requestLog}
-                logBodyRef={logBodyRef}
                 onClear={clearLog}
               />
             )}
@@ -295,17 +294,11 @@ export default function App() {
                 setDomainInput={setDomainInput}
                 onDomainSubmit={handleDomainSubmit}
                 isBusy={isBusy}
-                publicUrl={publicUrl}
-                onCopyUrl={handleCopyUrl}
-                copyFeedback={copyFeedback}
               />
             )}
 
             {activePage === 'settings' && (
               <SettingsPage
-                session={session}
-                gauthEnabled={gauthEnabled}
-                onAuthToggle={handleAuthToggle}
                 theme={theme}
                 onToggleTheme={toggleTheme}
               />

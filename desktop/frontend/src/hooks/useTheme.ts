@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { getTheme, setTheme as saveTheme } from '../lib/storage'
+import { setTheme as saveTheme } from '../lib/storage'
 
 export function useTheme() {
   const [theme, setThemeState] = useState<'light' | 'dark'>('dark')

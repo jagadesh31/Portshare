@@ -36,12 +36,15 @@ export function createTunnelConnection({ apiBaseUrl, clientId, portRef, onStateC
 
       if (!port) {
         socket.send(JSON.stringify({ id: request.id, status: 503, headers: {}, error: 'No local port configured' }))
-        onLogEntry({ id: request.id, method: request.method, path: request.path, status: 503, timestamp: new Date().toISOString(), durationMs: 0 })
+        onLogEntry({ 
+          id: request.id, method: request.method, path: request.path, status: 503, 
+          timestamp: new Date().toISOString(), durationMs: 0 
+        })
         return
       }
 
+      const localHeaders: Record<string, string> = {}
       try {
-        const localHeaders: Record<string, string> = {}
         Object.entries(request.headers).forEach(([k, v]) => { localHeaders[k] = v.join(', ') })
         const requestBytes = fromBase64(request.body ?? '')
         const response = await fetch(`http://127.0.0.1:${port}${request.path}`, {
@@ -55,12 +58,30 @@ export function createTunnelConnection({ apiBaseUrl, clientId, portRef, onStateC
         if (socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify({ id: request.id, status: response.status, headers, body: toBase64(responseBody) }))
         }
-        onLogEntry({ id: request.id, method: request.method, path: request.path, status: response.status, timestamp: new Date().toISOString(), durationMs: Date.now() - startMs })
+        
+        let decodedBody = ''
+        if (request.body) {
+          try {
+            decodedBody = new TextDecoder().decode(fromBase64(request.body))
+          } catch (e) {
+            decodedBody = '(binary or invalid text data)'
+          }
+        }
+        
+        onLogEntry({ 
+          id: request.id, method: request.method, path: request.path, status: response.status, 
+          timestamp: new Date().toISOString(), durationMs: Date.now() - startMs,
+          headers: localHeaders, body: decodedBody
+        })
       } catch (error) {
         if (socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify({ id: request.id, status: 502, headers: {}, error: error instanceof Error ? error.message : 'Local service unavailable' }))
         }
-        onLogEntry({ id: request.id, method: request.method, path: request.path, status: 502, timestamp: new Date().toISOString(), durationMs: Date.now() - startMs })
+        onLogEntry({ 
+          id: request.id, method: request.method, path: request.path, status: 502, 
+          timestamp: new Date().toISOString(), durationMs: Date.now() - startMs,
+          headers: localHeaders
+        })
       }
     }
 

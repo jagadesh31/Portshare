@@ -50,6 +50,8 @@ export type RequestLogEntry = {
   status: number | null
   timestamp: string
   durationMs: number | null
+  headers?: Record<string, string>
+  body?: string
 }
 
 export type ConnectionState = 'idle' | 'connecting' | 'connected' | 'disconnected'
