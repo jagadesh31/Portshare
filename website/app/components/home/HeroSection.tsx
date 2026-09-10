@@ -85,12 +85,6 @@ export default function HeroSection({ publicDomain, sampleSubdomain, samplePort,
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
           <span>Windows</span>
           <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.5 14.5h-9v-1.5h9v1.5zm0-3h-9v-1.5h9v1.5zm0-3h-9V9h9v1.5z"/></svg>
-          <span>macOS</span>
-          <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12.504 0c-.155 0-.315.008-.48.021C7.309.358 3.668 3.874 3.65 8.56c-.02 5.147 4.369 9.355 9.516 9.355 5.147 0 9.355-4.208 9.375-9.355C22.561 3.744 18.44.358 12.504 0z"/></svg>
-          <span>Linux</span>
-          <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span>
           <span style={{ fontFamily: 'var(--mono)', fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)', letterSpacing: '-0.01em' }}>
             ssh -R also supported
           </span>

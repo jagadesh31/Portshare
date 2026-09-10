@@ -23,27 +23,11 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-const MOCK_REQUEST_DETAIL = {
-  url: 'https://myapp.portshare.kexoz.dev/api/users',
-  requestHeaders: {
-    'Content-Type': 'application/json',
-    'Accept': '*/*',
-    'User-Agent': 'Mozilla/5.0',
-    'X-Forwarded-For': '203.0.113.12',
-  },
-  responseHeaders: {
-    'Content-Type': 'application/json; charset=utf-8',
-    'X-Response-Time': '12ms',
-    'Cache-Control': 'no-cache',
-  },
-  body: '{\n  "users": [\n    { "id": 1, "name": "Alice" }\n  ]\n}',
-}
-
 export default function RequestsPage({ requestLog, onClear }: Props) {
   const [selected, setSelected] = useState<RequestLogEntry | null>(null)
   const [activeTab, setActiveTab] = useState<'headers' | 'body' | 'response' | 'timing'>('headers')
 
-  const displayLog = requestLog.length > 0 ? requestLog : DEMO_REQUESTS
+  const displayLog = requestLog
 
   return (
     <div className="ps-main" style={{ overflow: 'hidden' }}>
@@ -130,10 +114,10 @@ export default function RequestsPage({ requestLog, onClear }: Props) {
                         General
                       </div>
                       <div className="ps-code">
-                        <div><span style={{ color: 'var(--text-muted)' }}>URL:</span> {MOCK_REQUEST_DETAIL.url}</div>
+                        <div><span style={{ color: 'var(--text-muted)' }}>URL:</span> {selected.path}</div>
                         <div><span style={{ color: 'var(--text-muted)' }}>Method:</span> {selected.method}</div>
                         <div><span style={{ color: 'var(--text-muted)' }}>Status:</span> {selected.status ?? 'Error'}</div>
-                        <div><span style={{ color: 'var(--text-muted)' }}>Time:</span> {selected.timestamp}</div>
+                        <div><span style={{ color: 'var(--text-muted)' }}>Time:</span> {formatTime(selected.timestamp)}</div>
                       </div>
                     </div>
                     <div>
@@ -141,19 +125,13 @@ export default function RequestsPage({ requestLog, onClear }: Props) {
                         Request Headers
                       </div>
                       <div className="ps-code">
-                        {Object.entries(MOCK_REQUEST_DETAIL.requestHeaders).map(([k, v]) => (
-                          <div key={k}><span style={{ color: 'var(--text-muted)' }}>{k}:</span> {v}</div>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
-                        Response Headers
-                      </div>
-                      <div className="ps-code">
-                        {Object.entries(MOCK_REQUEST_DETAIL.responseHeaders).map(([k, v]) => (
-                          <div key={k}><span style={{ color: 'var(--text-muted)' }}>{k}:</span> {v}</div>
-                        ))}
+                        {selected.headers && Object.keys(selected.headers).length > 0 ? (
+                          Object.entries(selected.headers).map(([k, v]) => (
+                            <div key={k}><span style={{ color: 'var(--text-muted)' }}>{k}:</span> {v}</div>
+                          ))
+                        ) : (
+                          <div style={{ color: 'var(--text-muted)' }}>(No headers recorded)</div>
+                        )}
                       </div>
                     </div>
                   </>
@@ -164,7 +142,7 @@ export default function RequestsPage({ requestLog, onClear }: Props) {
                       Request Body
                     </div>
                     <div className="ps-code" style={{ whiteSpace: 'pre' }}>
-                      {selected.method === 'GET' ? '(no body)' : MOCK_REQUEST_DETAIL.body}
+                      {selected.method === 'GET' ? '(no body)' : (selected.body || '(empty body)')}
                     </div>
                   </div>
                 )}
@@ -174,7 +152,7 @@ export default function RequestsPage({ requestLog, onClear }: Props) {
                       Response Body
                     </div>
                     <div className="ps-code" style={{ whiteSpace: 'pre' }}>
-                      {MOCK_REQUEST_DETAIL.body}
+                      (Response bodies are not currently recorded by the inspector proxy)
                     </div>
                   </div>
                 )}
@@ -219,14 +197,3 @@ export default function RequestsPage({ requestLog, onClear }: Props) {
   )
 }
 
-// Demo data shown when no real requests yet
-const DEMO_REQUESTS: RequestLogEntry[] = [
-  { id: '1', method: 'GET',    path: '/api/users',           status: 200, timestamp: new Date(Date.now() - 5000).toISOString(),   durationMs: 12 },
-  { id: '2', method: 'POST',   path: '/api/auth/login',      status: 201, timestamp: new Date(Date.now() - 12000).toISOString(),  durationMs: 48 },
-  { id: '3', method: 'GET',    path: '/api/products?page=2', status: 200, timestamp: new Date(Date.now() - 24000).toISOString(),  durationMs: 8 },
-  { id: '4', method: 'DELETE', path: '/api/posts/42',        status: 404, timestamp: new Date(Date.now() - 48000).toISOString(),  durationMs: 6 },
-  { id: '5', method: 'PUT',    path: '/api/users/7',         status: 200, timestamp: new Date(Date.now() - 65000).toISOString(),  durationMs: 22 },
-  { id: '6', method: 'POST',   path: '/api/webhooks',        status: 500, timestamp: new Date(Date.now() - 90000).toISOString(),  durationMs: 142 },
-  { id: '7', method: 'GET',    path: '/health',              status: 200, timestamp: new Date(Date.now() - 120000).toISOString(), durationMs: 3 },
-  { id: '8', method: 'PATCH',  path: '/api/settings',        status: 204, timestamp: new Date(Date.now() - 180000).toISOString(), durationMs: 17 },
-]

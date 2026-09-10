@@ -53,7 +53,7 @@ A cross-platform native application for developers who prefer visual management.
 A blazing-fast, static/server-rendered frontend.
 - **Tech Stack:** Next.js 15 (App Router), React, TypeScript, Tailwind CSS.
 - **Functionality:**
-  - Educates users and provides download links for Windows, macOS, and Linux binaries.
+  - Educates users and provides download links for the Windows binary.
   - Handles Stripe Checkout for premium upgrades.
   - Serves static legal pages (Terms, Privacy, Abuse Policy) and documentation.
 
