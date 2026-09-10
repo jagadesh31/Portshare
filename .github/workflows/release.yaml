@@ -11,6 +11,9 @@ permissions:
 jobs:
   build-and-release:
     runs-on: windows-latest
+    env:
+      VITE_PORTSHARE_API_BASE: "https://portshare.kexoz.dev"
+      VITE_PORTSHARE_ROOT_DOMAIN: "portshare.kexoz.dev"
     
     steps:
       - name: Checkout Code
@@ -28,9 +31,6 @@ jobs:
       - name: Build Frontend
         working-directory: desktop/frontend
         run: npm run build
-        env:
-          VITE_PORTSHARE_API_BASE: "https://portshare.kexoz.dev"
-          VITE_PORTSHARE_ROOT_DOMAIN: "portshare.kexoz.dev"
 
       - name: Install Electron Dependencies
         working-directory: desktop/electron
