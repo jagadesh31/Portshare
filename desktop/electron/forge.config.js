@@ -64,4 +64,17 @@ module.exports = {
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
   ],
+  publishers: [
+    {
+      name: '@electron-forge/publisher-github',
+      config: {
+        repository: {
+          owner: 'jagadesh31',
+          name: 'Portshare'
+        },
+        prerelease: false,
+        draft: true
+      }
+    }
+  ]
 };

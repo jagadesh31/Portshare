@@ -1,0 +1,33 @@
+name: Release Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          
+      - name: Install Frontend Dependencies
+        working-directory: desktop/frontend
+        run: npm ci
+
+      - name: Install Electron Dependencies
+        working-directory: desktop/electron
+        run: npm ci
+
+      - name: Package and Publish
+        working-directory: desktop/electron
+        run: npm run publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
