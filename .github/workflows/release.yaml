@@ -22,6 +22,10 @@ jobs:
         working-directory: desktop/frontend
         run: npm ci
 
+      - name: Build Frontend
+        working-directory: desktop/frontend
+        run: npm run build
+
       - name: Install Electron Dependencies
         working-directory: desktop/electron
         run: npm ci
