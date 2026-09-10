@@ -20,19 +20,27 @@ import { useTheme } from './hooks/useTheme'
 import { useRequestLog } from './hooks/useRequestLog'
 
 import AppShell from './components/layout/AppShell'
-import Topbar from './components/layout/Topbar'
+import Sidebar from './components/layout/Sidebar'
 import FeedbackBanner from './components/ui/FeedbackBanner'
 import LoadingScreen from './components/screens/LoadingScreen'
 import SubdomainScreen from './components/screens/SubdomainScreen'
-import DashboardScreen from './components/screens/DashboardScreen'
-import RequestLog from './components/dashboard/RequestLog'
+import DashboardPage from './components/pages/DashboardPage'
+import TunnelsPage from './components/pages/TunnelsPage'
+import RequestsPage from './components/pages/RequestsPage'
+import DomainsPage from './components/pages/DomainsPage'
+import SettingsPage from './components/pages/SettingsPage'
+
+type Page = 'dashboard' | 'tunnels' | 'requests' | 'domains' | 'settings'
 
 export default function App() {
   const [step, setStep] = useState<FlowStep>('loading')
+  const [activePage, setActivePage] = useState<Page>('dashboard')
   const [session, setSession] = useState<ClientSession | null>(null)
+  
   const [subdomainInput, setSubdomainInput] = useState('')
   const [portInput, setPortInput] = useState('')
   const [domainInput, setDomainInput] = useState('')
+  
   const [statusMessage, setStatusMessage] = useState('Starting secure tunnel client...')
   const [infoMessage, setInfoMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
@@ -200,47 +208,45 @@ export default function App() {
     window.setTimeout(() => setCopyFeedback('idle'), 1800)
   }
 
-  const connLabel = connState === 'connected' ? 'Tunnel live' : connState === 'connecting' ? 'Connecting...' : connState === 'disconnected' ? 'Reconnecting...' : 'Idle'
-
   return (
     <>
       <Toaster position="bottom-right" />
       <AppShell>
-        <Topbar
-          step={step}
-          publicUrl={publicUrl}
-          connState={connState}
-          connLabel={connLabel}
-          totalRequests={totalRequests}
-          statusMessage={statusMessage}
-          theme={theme}
-          copyFeedback={copyFeedback}
-          onCopyUrl={handleCopyUrl}
-          onToggleTheme={toggleTheme}
-        />
+        {step === 'dashboard' && session && (
+          <Sidebar
+            activePage={activePage}
+            onNavigate={setActivePage}
+            connState={connState}
+            publicUrl={publicUrl}
+            requestCount={totalRequests}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+          />
+        )}
+        
+        {step === 'loading' && (
+          <LoadingScreen key="loading" statusMessage={statusMessage} errorMessage={errorMessage} onRetry={() => void bootstrapClient()} />
+        )}
 
-        <main className="console-content">
-          <AnimatePresence mode="wait">
-            {step === 'loading' && (
-              <LoadingScreen key="loading" statusMessage={statusMessage} errorMessage={errorMessage} onRetry={() => void bootstrapClient()} />
-            )}
+        {step === 'subdomain' && session && (
+          <main className="console-content">
+            <SubdomainScreen
+              key="subdomain"
+              session={session}
+              subdomainInput={subdomainInput}
+              setSubdomainInput={setSubdomainInput}
+              onSubmit={handleSubdomainSubmit}
+              isBusy={isBusy}
+              gauthEnabled={gauthEnabled}
+              onAuthToggle={handleAuthToggle}
+            />
+          </main>
+        )}
 
-            {step === 'subdomain' && session && (
-              <SubdomainScreen
-                key="subdomain"
-                session={session}
-                subdomainInput={subdomainInput}
-                setSubdomainInput={setSubdomainInput}
-                onSubmit={handleSubdomainSubmit}
-                isBusy={isBusy}
-                gauthEnabled={gauthEnabled}
-                onAuthToggle={handleAuthToggle}
-              />
-            )}
-
-            {step === 'dashboard' && session && (
-              <DashboardScreen
-                key="dashboard"
+        {step === 'dashboard' && session && (
+          <>
+            {activePage === 'dashboard' && (
+              <DashboardPage
                 session={session}
                 connState={connState}
                 portInput={portInput}
@@ -252,20 +258,62 @@ export default function App() {
                 gauthEnabled={gauthEnabled}
                 onAuthToggle={handleAuthToggle}
                 isBusy={isBusy}
+                totalRequests={totalRequests}
+                onCopyUrl={handleCopyUrl}
+                copyFeedback={copyFeedback}
+                statusMessage={statusMessage}
+                uptimeSeconds={0}
               />
             )}
-          </AnimatePresence>
+            
+            {activePage === 'tunnels' && (
+              <TunnelsPage
+                session={session}
+                connState={connState}
+                portInput={portInput}
+                setPortInput={setPortInput}
+                onPortSubmit={handlePortSubmit}
+                isBusy={isBusy}
+                totalRequests={totalRequests}
+                onCopyUrl={handleCopyUrl}
+                copyFeedback={copyFeedback}
+              />
+            )}
 
-          {step === 'dashboard' && (
-            <RequestLog
-              requestLog={requestLog}
-              logBodyRef={logBodyRef}
-              onClear={clearLog}
-            />
-          )}
+            {activePage === 'requests' && (
+              <RequestsPage
+                requestLog={requestLog}
+                logBodyRef={logBodyRef}
+                onClear={clearLog}
+              />
+            )}
 
-          <FeedbackBanner infoMessage={infoMessage} errorMessage={errorMessage} />
-        </main>
+            {activePage === 'domains' && (
+              <DomainsPage
+                session={session}
+                domainInput={domainInput}
+                setDomainInput={setDomainInput}
+                onDomainSubmit={handleDomainSubmit}
+                isBusy={isBusy}
+                publicUrl={publicUrl}
+                onCopyUrl={handleCopyUrl}
+                copyFeedback={copyFeedback}
+              />
+            )}
+
+            {activePage === 'settings' && (
+              <SettingsPage
+                session={session}
+                gauthEnabled={gauthEnabled}
+                onAuthToggle={handleAuthToggle}
+                theme={theme}
+                onToggleTheme={toggleTheme}
+              />
+            )}
+            
+            <FeedbackBanner infoMessage={infoMessage} errorMessage={errorMessage} />
+          </>
+        )}
       </AppShell>
     </>
   )

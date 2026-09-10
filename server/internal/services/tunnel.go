@@ -19,6 +19,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"golang.org/x/time/rate"
 )
 
 const maxTunnelBody = 10 << 20
@@ -225,6 +226,29 @@ func isExpectedWSClose(err error) bool {
 	return false
 }
 
+var ipRateLimiters = struct {
+	sync.RWMutex
+	limiters map[string]*rate.Limiter
+}{limiters: make(map[string]*rate.Limiter)}
+
+func getIPLimiter(ip string) *rate.Limiter {
+	ipRateLimiters.RLock()
+	limiter, exists := ipRateLimiters.limiters[ip]
+	ipRateLimiters.RUnlock()
+
+	if !exists {
+		ipRateLimiters.Lock()
+		defer ipRateLimiters.Unlock()
+		limiter, exists = ipRateLimiters.limiters[ip]
+		if !exists {
+			// 30 requests per second, burst of 60
+			limiter = rate.NewLimiter(30, 60)
+			ipRateLimiters.limiters[ip] = limiter
+		}
+	}
+	return limiter
+}
+
 func HandlePublicTunnel(c *gin.Context) {
 	clientID := clientForHost(c.Request.Host)
 	if clientID == "" {
@@ -242,6 +266,13 @@ func HandlePublicTunnel(c *gin.Context) {
 	sshStore.RLock()
 	sshConnection := sshStore.connections[clientID]
 	sshStore.RUnlock()
+
+	// 1. IP Rate Limiting (Anti-Abuse)
+	clientIP := c.ClientIP()
+	if !getIPLimiter(clientIP).Allow() {
+		c.JSON(http.StatusTooManyRequests, gin.H{"message": "rate limit exceeded. please slow down."})
+		return
+	}
 
 	if connection == nil && sshConnection == nil {
 		if strings.Contains(c.GetHeader("Accept"), "text/html") {

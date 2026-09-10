@@ -1,5 +1,6 @@
 import { LayoutDashboard, Link2, Activity, Globe, Settings, Zap } from 'lucide-react'
 import type { ConnectionState } from '../../lib/api'
+import ThemeToggle from '../ui/ThemeToggle'
 
 type Page = 'dashboard' | 'tunnels' | 'requests' | 'domains' | 'settings'
 
@@ -9,6 +10,8 @@ type Props = {
   connState: ConnectionState
   publicUrl: string
   requestCount: number
+  theme: 'light' | 'dark'
+  onToggleTheme: () => void
 }
 
 const navItems: { id: Page; label: string; icon: typeof LayoutDashboard }[] = [
@@ -26,7 +29,7 @@ const connLabels: Record<ConnectionState, string> = {
   disconnected: 'Reconnecting',
 }
 
-export default function Sidebar({ activePage, onNavigate, connState, publicUrl, requestCount }: Props) {
+export default function Sidebar({ activePage, onNavigate, connState, publicUrl, requestCount, theme, onToggleTheme }: Props) {
   return (
     <aside className="ps-sidebar animate-slide-left">
       {/* Brand */}
@@ -41,7 +44,7 @@ export default function Sidebar({ activePage, onNavigate, connState, publicUrl, 
       </div>
 
       {/* Navigation */}
-      <nav className="ps-nav">
+      <nav className="ps-nav" style={{ flex: 1 }}>
         <div className="ps-nav-section-label">Navigation</div>
         {navItems.map(({ id, label, icon: Icon }) => (
           <button
@@ -57,6 +60,11 @@ export default function Sidebar({ activePage, onNavigate, connState, publicUrl, 
           </button>
         ))}
       </nav>
+
+      {/* Theme Toggle */}
+      <div style={{ padding: '0 12px 12px' }}>
+        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+      </div>
 
       {/* Connection Status */}
       <div className="ps-sidebar-status">

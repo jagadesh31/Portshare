@@ -1,13 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;1,14..32,400&family=JetBrains+Mono:wght@400;500&display=swap');
 
-/* ─── DESIGN TOKENS ───────────────────────────────────────── */
-:root {
+/* ═══════════════════════════════════════════════
+   DARK MODE (default)
+   ═══════════════════════════════════════════════ */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+
   /* Backgrounds */
   --bg-app:        #08090B;
   --bg-sidebar:    #0D0E10;
   --bg-surface:    #111318;
   --bg-elevated:   #181B20;
-  --bg-overlay:    rgba(8, 9, 11, 0.85);
+  --bg-overlay:    rgba(8, 9, 11, 0.88);
   --bg-input:      #0F1115;
   --bg-hover:      rgba(255, 255, 255, 0.04);
   --bg-active:     rgba(139, 92, 246, 0.12);
@@ -24,7 +29,7 @@
   --accent-glow:   rgba(139, 92, 246, 0.25);
   --accent-hover:  #9D6EFF;
 
-  /* Status colors */
+  /* Status */
   --green:         #34D399;
   --green-dim:     rgba(52, 211, 153, 0.12);
   --red:           #F87171;
@@ -43,11 +48,72 @@
   --text-soft:     #52566A;
   --text-accent:   #A78BFA;
 
-  /* Typography */
+  /* Shadows */
+  --shadow-sm:     0 1px 3px rgba(0,0,0,0.45);
+  --shadow-md:     0 4px 16px rgba(0,0,0,0.55);
+  --shadow-lg:     0 8px 32px rgba(0,0,0,0.65);
+  --shadow-accent: 0 0 0 1px rgba(139,92,246,0.4), 0 4px 20px rgba(139,92,246,0.2);
+}
+
+/* ═══════════════════════════════════════════════
+   LIGHT MODE
+   ═══════════════════════════════════════════════ */
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Backgrounds */
+  --bg-app:        #F8F8FC;
+  --bg-sidebar:    #FFFFFF;
+  --bg-surface:    #FFFFFF;
+  --bg-elevated:   #F3F4F8;
+  --bg-overlay:    rgba(248, 248, 252, 0.92);
+  --bg-input:      #FFFFFF;
+  --bg-hover:      rgba(0, 0, 0, 0.04);
+  --bg-active:     rgba(139, 92, 246, 0.08);
+
+  /* Borders */
+  --border:        rgba(0, 0, 0, 0.08);
+  --border-bright: rgba(0, 0, 0, 0.13);
+  --border-focus:  rgba(139, 92, 246, 0.5);
+  --border-input:  rgba(0, 0, 0, 0.1);
+
+  /* Accents */
+  --accent:        #7C3AED;
+  --accent-dim:    rgba(124, 58, 237, 0.1);
+  --accent-glow:   rgba(124, 58, 237, 0.2);
+  --accent-hover:  #6D28D9;
+
+  /* Status */
+  --green:         #059669;
+  --green-dim:     rgba(5, 150, 105, 0.1);
+  --red:           #DC2626;
+  --red-dim:       rgba(220, 38, 38, 0.08);
+  --yellow:        #D97706;
+  --yellow-dim:    rgba(217, 119, 6, 0.1);
+  --blue:          #2563EB;
+  --blue-dim:      rgba(37, 99, 235, 0.1);
+  --cyan:          #0891B2;
+  --cyan-dim:      rgba(8, 145, 178, 0.1);
+
+  /* Text */
+  --text:          #1A1A2E;
+  --text-strong:   #0A0A18;
+  --text-muted:    #52526E;
+  --text-soft:     #9090A8;
+  --text-accent:   #7C3AED;
+
+  /* Shadows */
+  --shadow-sm:     0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md:     0 4px 16px rgba(0,0,0,0.1);
+  --shadow-lg:     0 8px 32px rgba(0,0,0,0.12);
+  --shadow-accent: 0 0 0 1px rgba(124,58,237,0.35), 0 4px 20px rgba(124,58,237,0.15);
+}
+
+/* ─── SHARED TOKENS (theme-independent) ─────── */
+:root {
   --sans-font:   'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --mono-font:   'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
 
-  /* Radii */
   --radius-xs:   4px;
   --radius-sm:   6px;
   --radius:      10px;
@@ -55,16 +121,8 @@
   --radius-lg:   16px;
   --radius-xl:   20px;
 
-  /* Shadows */
-  --shadow-sm:   0 1px 3px rgba(0,0,0,0.4);
-  --shadow-md:   0 4px 16px rgba(0,0,0,0.5);
-  --shadow-lg:   0 8px 32px rgba(0,0,0,0.6);
-  --shadow-accent: 0 0 0 1px rgba(139,92,246,0.4), 0 4px 20px rgba(139,92,246,0.2);
+  --sidebar-w:   220px;
 
-  /* Sidebar */
-  --sidebar-w: 220px;
-
-  /* Transitions */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
 }

@@ -1,15 +1,36 @@
 'use client';
-import { Zap } from 'lucide-react';
+import { Zap, Sun, Moon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('portshare-web-theme');
+    if (saved === 'light' || saved === 'dark') {
+      setTheme(saved);
+      document.documentElement.dataset.theme = saved;
+      return;
+    }
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initial = prefersDark ? 'dark' : 'light';
+    setTheme(initial);
+    document.documentElement.dataset.theme = initial;
+  }, []);
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    localStorage.setItem('portshare-web-theme', next);
+    document.documentElement.dataset.theme = next;
+  };
 
   return (
     <header className={`site-header ${scrolled ? 'scrolled' : ''}`}>
@@ -28,7 +49,15 @@ export default function Header() {
         <a className="nav-link" href="/pricing">Pricing</a>
       </nav>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button
+          onClick={toggleTheme}
+          className="nav-link"
+          style={{ padding: '6px 8px', display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer' }}
+          title="Toggle theme"
+        >
+          {theme === 'dark' ? <Sun size={17} strokeWidth={2} /> : <Moon size={17} strokeWidth={2} />}
+        </button>
         <a
           href="https://github.com/jagadesh31/Portshare"
           target="_blank"
@@ -42,7 +71,7 @@ export default function Header() {
             <path d="M9 18c-4.51 2-5-2-7-2"/>
           </svg>
         </a>
-        <a className="btn btn-primary" href="/download/portshare-desktop" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+        <a className="btn btn-primary" href="/download/portshare-desktop" style={{ padding: '8px 16px', fontSize: '0.85rem', marginLeft: '4px' }}>
           Download Free
         </a>
       </div>
