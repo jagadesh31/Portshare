@@ -1,7 +1,7 @@
 import './App.css'
 import axios from 'axios'
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Lock, ShieldCheck, Zap, Activity } from 'lucide-react'
+import { ShieldCheck, Activity } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -669,7 +669,7 @@ function App() {
               {/* GAuth security toggle */}
               <div className="gauth-section">
                 <div className="gauth-info">
-                  <div className="gauth-icon" aria-hidden="true">&#x1F512;</div>
+                  <div className="gauth-icon" aria-hidden="true"><ShieldCheck size={24} /></div>
                   <div>
                     <p className="gauth-title">Google Auth Wall</p>
                     <p className="gauth-desc">
@@ -680,15 +680,15 @@ function App() {
                   </div>
                 </div>
                 <button
-                  id="gauth-toggle-btn"
+                  id="gauth-toggle-btn-dashboard"
                   type="button"
                   role="switch"
                   aria-checked={session?.requireAuth ?? false}
-                  className={\	oggle-switch ${session?.requireAuth ? 'toggle-on' : ''}\`}
+                  className={`toggle-switch ${session?.requireAuth ? 'toggle-on' : ''}`}
                   onClick={handleAuthToggle}
                   disabled={isBusy || !gauthEnabled}
                   title={!gauthEnabled ? 'Configure GOOGLE_CLIENT_ID on the server to enable' : ''}
-                />
+                ></button>
               </div>
             </section>
           )}
