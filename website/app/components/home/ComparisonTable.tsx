@@ -1,32 +1,34 @@
-import SectionHeader from "../ui/SectionHeader";
-import FeatureCheck from "../ui/FeatureCheck";
+import SectionHeader from '../ui/SectionHeader';
+import FeatureCheck from '../ui/FeatureCheck';
 
 const comparisonData = [
-  { feature: "Permanent subdomains", portshare: "yes", ngrok: "yes", cloudflare: "yes" },
-  { feature: "Custom domain (BYOD)", portshare: "yes", ngrok: "Paid only", cloudflare: "yes" },
-  { feature: "Request inspector + replay", portshare: "yes", ngrok: "yes", cloudflare: "no" },
-  { feature: "Desktop GUI client", portshare: "yes", ngrok: "no", cloudflare: "no" },
-  { feature: "Zero-config setup", portshare: "yes", ngrok: "Partial", cloudflare: "Partial" },
-  { feature: "Self-hostable", portshare: "yes", ngrok: "no", cloudflare: "no" },
-  { feature: "Open source client", portshare: "yes", ngrok: "no", cloudflare: "no" },
-  { feature: "Generous free tier", portshare: "yes", ngrok: "Limited", cloudflare: "Limited" },
+  { feature: 'Permanent subdomains',       portshare: 'yes',   ngrok: 'yes',      cloudflare: 'yes'     },
+  { feature: 'Custom domain (BYOD)',        portshare: 'yes',   ngrok: 'Paid only', cloudflare: 'yes'    },
+  { feature: 'Request inspector + replay', portshare: 'yes',   ngrok: 'yes',      cloudflare: 'no'      },
+  { feature: 'Desktop GUI client',         portshare: 'yes',   ngrok: 'no',       cloudflare: 'no'      },
+  { feature: 'Zero-install SSH tunnel',    portshare: 'yes',   ngrok: 'no',       cloudflare: 'no'      },
+  { feature: 'Self-hostable',              portshare: 'yes',   ngrok: 'no',       cloudflare: 'no'      },
+  { feature: 'Open source client',         portshare: 'yes',   ngrok: 'no',       cloudflare: 'no'      },
+  { feature: 'Generous free tier',         portshare: 'yes',   ngrok: 'Limited',  cloudflare: 'Limited' },
+  { feature: 'Google Auth wall',           portshare: 'yes',   ngrok: 'Paid only', cloudflare: 'no'     },
+  { feature: 'Live request stats',         portshare: 'yes',   ngrok: 'yes',      cloudflare: 'no'      },
 ];
 
 export default function ComparisonTable() {
   return (
     <section id="comparison-section">
-      <SectionHeader 
+      <SectionHeader
         id="compare"
         eyebrow="Compare"
         title="Why choose PortShare?"
-        description="See how we stack up against the established alternatives."
+        description="We built the features developers actually need. See how we compare to the alternatives."
       />
-      <div className="comparison-section" style={{ marginTop: '40px' }}>
+      <div style={{ marginTop: '40px' }}>
         <div className="table-container">
           <table className="comparison-table">
             <thead>
               <tr>
-                <th className="feature-col">Feature</th>
+                <th className="feature-col" style={{ width: '40%' }}>Feature</th>
                 <th className="portshare-col">PortShare</th>
                 <th>ngrok</th>
                 <th>Cloudflare</th>

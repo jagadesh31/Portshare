@@ -38,6 +38,7 @@ func main() {
 	routes.AuthRoutes(r)
 	routes.ClientRoutes(r)
 	routes.BillingRoutes(r)
+	routes.StatsRoutes(r)
 	r.GET("/tunnel/connect", services.ConnectTunnel)
 
 	r.GET("/health", func(ctx *gin.Context) {

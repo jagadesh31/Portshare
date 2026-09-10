@@ -10,7 +10,7 @@ export default function PricingPage() {
     <div className="landing-wrap">
       <main className="landing-main" style={{ paddingTop: "80px" }}>
         
-        <Header style={{ marginBottom: "60px" }} />
+        <Header />
 
         <SectionHeader 
           title="Simple, transparent pricing" 

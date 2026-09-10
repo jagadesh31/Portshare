@@ -5,6 +5,8 @@ import HeroSection from './components/home/HeroSection';
 import HowItWorks from './components/home/HowItWorks';
 import FeaturesGrid from './components/home/FeaturesGrid';
 import ComparisonTable from './components/home/ComparisonTable';
+import LiveStatsSection from './components/home/LiveStatsSection';
+import CTASection from './components/home/CTASection';
 
 const requiredPublicEnv = (value: string | undefined, name: string): string => {
   if (!value?.trim()) throw new Error(`Missing required environment variable: ${name}`);
@@ -21,10 +23,17 @@ export default function Home() {
     <div className="landing-wrap">
       <main className="landing-main">
         <Header />
-        <HeroSection publicDomain={publicDomain} sampleSubdomain={sampleSubdomain} samplePort={samplePort} />
+        <HeroSection
+          publicDomain={publicDomain}
+          sampleSubdomain={sampleSubdomain}
+          samplePort={samplePort}
+          totalRequests={1284931}
+        />
         <HowItWorks sampleSubdomain={sampleSubdomain} publicDomain={publicDomain} />
         <FeaturesGrid publicDomain={publicDomain} />
+        <LiveStatsSection />
         <ComparisonTable />
+        <CTASection />
         <Footer />
       </main>
     </div>

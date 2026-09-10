@@ -1,42 +1,68 @@
-import { Search, Globe, Tag, Monitor } from "lucide-react";
-import SectionHeader from "../ui/SectionHeader";
+import { Search, Globe, Tag, Monitor, Shield, Zap, Terminal, Clock } from 'lucide-react';
+import SectionHeader from '../ui/SectionHeader';
 
 export default function FeaturesGrid({ publicDomain }: { publicDomain: string }) {
+  const features = [
+    {
+      icon: <Search size={22} />,
+      tag: 'Built-in',
+      title: 'Request Inspector',
+      body: 'See every HTTP request hitting your tunnel in real-time — method, path, headers, status, and JSON body. Replay any request with one click.',
+    },
+    {
+      icon: <Globe size={22} />,
+      tag: 'Permanent',
+      title: 'Persistent Subdomains',
+      body: `Your subdomain on ${publicDomain} is yours forever. Set it once, configure webhooks and share with clients — it never changes.`,
+    },
+    {
+      icon: <Tag size={22} />,
+      tag: 'Pro',
+      title: 'Custom Domains',
+      body: 'Map tunnel.yourdomain.com to your local server via a CNAME record. Your clients never see a generic subdomain.',
+    },
+    {
+      icon: <Monitor size={22} />,
+      tag: 'Desktop',
+      title: 'Native Desktop App',
+      body: 'A premium, minimal GUI that lives in your menubar. Toggle tunnels, inspect requests, manage domains — all without a terminal.',
+    },
+    {
+      icon: <Terminal size={22} />,
+      tag: 'Zero Install',
+      title: 'SSH Tunnel Support',
+      body: 'Use any machine\'s native SSH: ssh -R 80:localhost:3000 portshare.kexoz.dev. No client install required anywhere.',
+    },
+    {
+      icon: <Shield size={22} />,
+      tag: 'Security',
+      title: 'Google Auth Wall',
+      body: 'Protect tunnels with Google OAuth in one click. Only authorized Google accounts can access your tunnel URL.',
+    },
+    {
+      icon: <Zap size={22} />,
+      tag: 'Fast',
+      title: 'Persistent WebSocket',
+      body: 'A single WebSocket connection handles all traffic with automatic reconnection, pings and exponential backoff.',
+    },
+    {
+      icon: <Clock size={22} />,
+      tag: 'History',
+      title: 'Request Replay',
+      body: 'Scroll back through your request history and replay any call instantly. Perfect for debugging flaky webhooks.',
+    },
+  ];
+
   return (
     <section id="features-section">
-      <SectionHeader 
+      <SectionHeader
         id="features"
         eyebrow="Features"
-        title="Everything you need, nothing you don't"
-        description="Built by developers for developers — every feature is designed to reduce friction."
+        title="Everything developers need"
+        description="Built by developers for developers — every feature reduces friction, not adds it."
       />
       <div className="features-grid" style={{ marginTop: '40px' }}>
-        {[
-          {
-            icon: <Search size={24} />,
-            tag: "Built-in",
-            title: "Request Inspector",
-            body: "See every HTTP request hitting your tunnel in real-time — method, path, headers, and JSON body. Replay any request with one click for faster webhook debugging.",
-          },
-          {
-            icon: <Globe size={24} />,
-            tag: "Persistent",
-            title: "Permanent Subdomains",
-            body: `Your subdomain on ${publicDomain} is yours for life. Set it once, use it forever. Share it with clients, configure it in your webhooks dashboard and never change it again.`,
-          },
-          {
-            icon: <Tag size={24} />,
-            tag: "Pro",
-            title: "Bring Your Own Domain",
-            body: "Map any domain you own (like dev.yourcompany.com) to your tunnel with a simple CNAME record. Your clients never need to know you're running locally.",
-          },
-          {
-            icon: <Monitor size={24} />,
-            tag: "Desktop + CLI",
-            title: "Native Desktop Client",
-            body: "A beautiful, minimal desktop GUI that lives in your menubar. Toggle tunnels on/off with a switch, see live stats, and inspect requests — all without touching a terminal.",
-          },
-        ].map((f) => (
+        {features.map((f) => (
           <article key={f.title} className="feature-card">
             <div className="feature-icon">{f.icon}</div>
             <span className="feature-tag">{f.tag}</span>
