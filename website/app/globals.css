@@ -317,7 +317,7 @@ section { margin-bottom: 140px; }
   font-weight: 900;
   line-height: 1.05;
   letter-spacing: -0.05em;
-  color: #fff;
+  color: var(--text-strong);
   max-width: 18ch;
   animation: fade-up 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: 0.1s;
@@ -382,7 +382,7 @@ section { margin-bottom: 140px; }
 .stat-value {
   font-size: 1.6rem;
   font-weight: 800;
-  color: #fff;
+  color: var(--text-strong);
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -555,7 +555,7 @@ section { margin-bottom: 140px; }
   font-size: clamp(1.8rem, 3.5vw, 2.6rem);
   font-weight: 800;
   letter-spacing: -0.04em;
-  color: #fff;
+  color: var(--text-strong);
   line-height: 1.1;
 }
 
@@ -646,7 +646,7 @@ section { margin-bottom: 140px; }
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
-.flow-card h2 { margin: 0; font-size: 1.05rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
+.flow-card h2 { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-strong); letter-spacing: -0.02em; }
 .flow-card p  { margin: 0; color: var(--text-muted); line-height: 1.65; font-size: 0.88rem; }
 
 /* ─── FEATURES GRID ───────────────────────────────────── */
@@ -724,7 +724,7 @@ section { margin-bottom: 140px; }
   width: fit-content;
 }
 
-.feature-card h3 { margin: 0; font-size: 1.05rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
+.feature-card h3 { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-strong); letter-spacing: -0.02em; }
 .feature-card p  { margin: 0; color: var(--text-muted); font-size: 0.88rem; line-height: 1.65; }
 
 /* ─── LIVE STATS SECTION ──────────────────────────────── */
@@ -766,7 +766,7 @@ section { margin-bottom: 140px; }
 .live-stat-num {
   font-size: 2.2rem;
   font-weight: 800;
-  color: #fff;
+  color: var(--text-strong);
   letter-spacing: -0.05em;
   line-height: 1;
   font-variant-numeric: tabular-nums;

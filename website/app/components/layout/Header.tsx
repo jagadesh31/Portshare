@@ -35,9 +35,7 @@ export default function Header() {
   return (
     <header className={`site-header ${scrolled ? 'scrolled' : ''}`}>
       <a href="/" className="site-brand">
-        <div className="site-brand-icon">
-          <Zap size={14} color="#fff" strokeWidth={2.5} />
-        </div>
+
         PortShare
       </a>
 
