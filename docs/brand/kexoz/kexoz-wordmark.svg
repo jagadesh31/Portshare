@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 160" fill="none" role="img" aria-label="Kexoz">
+  <rect x="0" y="16" width="128" height="128" rx="28" fill="#0B0D12"/>
+  <rect x="33" y="38" width="18" height="84" rx="3" fill="#F4F5F7"/>
+  <path d="M55 74L89 42h14.5L62 82l-7-8z" fill="#F4F5F7"/>
+  <path d="M55 78L96.5 118H82L55 86v-8z" fill="#F4F5F7"/>
+  <path d="M55 74l10.5-10 10.5 10-10.5 10L55 74z" fill="#10B981"/>
+  <path d="M55 78l10.5 10 10.5-10-10.5-10L55 78z" fill="#10B981"/>
+  <text x="156" y="108" fill="#0B0D12" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="78" font-weight="700" letter-spacing="-0.04em">Kexoz</text>
+</svg>

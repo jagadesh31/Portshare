@@ -20,11 +20,7 @@ export default function SubdomainScreen({
     <div className="ps-onboard">
       <div className="ps-onboard-bar">
         <div className="ps-sidebar-brand" style={{ padding: 0, border: 'none', margin: 0 }}>
-          <div className="ps-brand-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-            </svg>
-          </div>
+          <img src="./logo.svg" alt="" width={30} height={30} style={{ borderRadius: 7 }} />
           <div className="ps-brand-name">PortShare</div>
         </div>
         <ThemeToggle theme={theme} onToggle={onToggleTheme} compact />

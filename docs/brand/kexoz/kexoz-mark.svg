@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" role="img" aria-label="Kexoz">
+  <!-- Kexoz Labs mark: geometric K + emerald joint accents -->
+  <rect width="512" height="512" rx="112" fill="#0B0D12"/>
+  <!-- Left stem -->
+  <rect x="132" y="118" width="72" height="276" rx="12" fill="#F4F5F7"/>
+  <!-- Upper arm -->
+  <path d="M220 248L356 118h58L248 278l-28-30z" fill="#F4F5F7"/>
+  <!-- Lower arm -->
+  <path d="M220 264L386 394h-58L220 294v-30z" fill="#F4F5F7"/>
+  <!-- Emerald joint accents -->
+  <path d="M220 248l42-40 42 40-42 40-42-40z" fill="#10B981"/>
+  <path d="M220 264l42 40 42-40-42-40-42 40z" fill="#10B981"/>
+</svg>

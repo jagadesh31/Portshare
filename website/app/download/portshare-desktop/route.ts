@@ -1,11 +1,22 @@
 import { NextResponse } from "next/server";
 
-export function GET() {
+export function GET(request: Request) {
   const downloadUrl = process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL?.trim();
   if (!downloadUrl) {
     return NextResponse.json(
       { message: "NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL is not configured" },
       { status: 500 },
+    );
+  }
+
+  const { searchParams } = new URL(request.url);
+  const platform = searchParams.get("platform") || "windows-x64";
+
+  // Current CI release only publishes the Windows x64 Squirrel installer.
+  if (platform !== "windows-x64") {
+    return NextResponse.json(
+      { message: "This platform is not available yet" },
+      { status: 404 },
     );
   }
 

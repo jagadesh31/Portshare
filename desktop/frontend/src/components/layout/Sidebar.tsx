@@ -1,4 +1,4 @@
-import { LayoutDashboard, Link2, Activity, Globe, Settings, Zap } from 'lucide-react'
+import { LayoutDashboard, Link2, Activity, Globe, Settings } from 'lucide-react'
 import type { ConnectionState } from '../../lib/api'
 import ThemeToggle from '../ui/ThemeToggle'
 
@@ -34,9 +34,7 @@ export default function Sidebar({ activePage, onNavigate, connState, publicUrl, 
     <aside className="ps-sidebar animate-slide-left">
       {/* Brand */}
       <div className="ps-sidebar-brand">
-        <div className="ps-brand-icon">
-          <Zap size={16} strokeWidth={2.5} />
-        </div>
+        <img src="./logo.svg" alt="" width={30} height={30} style={{ borderRadius: 7, display: 'block' }} />
         <div>
           <div className="ps-brand-name">PortShare</div>
           <div className="ps-brand-version">Desktop</div>

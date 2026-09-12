@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PortShare — Expose localhost with a public URL in seconds",
+  title: "PortShare — Public URLs for localhost",
   description:
-    "PortShare is a fast, developer-first tunnel client. Get a permanent public subdomain for your local dev server in seconds. Custom domains, webhook inspector, zero friction.",
+    "Expose your local development server with a permanent HTTPS subdomain. Desktop client, request inspector, and custom domains.",
   keywords: [
     "localhost tunnel",
     "ngrok alternative",
@@ -24,10 +24,13 @@ export const metadata: Metadata = {
     "webhook testing",
     "developer tools",
   ],
+  icons: {
+    icon: "/logo.svg",
+  },
   openGraph: {
-    title: "PortShare — Expose localhost with a public URL in seconds",
+    title: "PortShare — Public URLs for localhost",
     description:
-      "Fast, developer-first tunnel client. Permanent subdomains, custom domains, webhook inspector.",
+      "Permanent HTTPS subdomains for local development. Desktop client and request inspector included.",
     type: "website",
   },
 };
@@ -41,7 +44,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
-      <body>
+      <body className={geistSans.className}>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         {children}
       </body>

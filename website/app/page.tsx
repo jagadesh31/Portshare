@@ -3,10 +3,10 @@ import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import HeroSection from './components/home/HeroSection';
 import HowItWorks from './components/home/HowItWorks';
-import FeaturesGrid from './components/home/FeaturesGrid';
+import ProductPreview from './components/home/ProductPreview';
 import ComparisonTable from './components/home/ComparisonTable';
-import LiveStatsSection from './components/home/LiveStatsSection';
-import CTASection from './components/home/CTASection';
+import SmoothScroll from './components/motion/SmoothScroll';
+import ParticlesField from './components/motion/ParticlesField';
 
 const requiredPublicEnv = (value: string | undefined, name: string): string => {
   if (!value?.trim()) throw new Error(`Missing required environment variable: ${name}`);
@@ -20,21 +20,32 @@ export default function Home() {
   const samplePort = requiredPublicEnv(process.env.NEXT_PUBLIC_SAMPLE_PORT, 'NEXT_PUBLIC_SAMPLE_PORT');
 
   return (
-    <div className="landing-wrap">
-      <main className="landing-main">
-        <Header />
-        <HeroSection
-          publicDomain={publicDomain}
-          sampleSubdomain={sampleSubdomain}
-          samplePort={samplePort}
-        />
-        <HowItWorks sampleSubdomain={sampleSubdomain} publicDomain={publicDomain} />
-        <FeaturesGrid publicDomain={publicDomain} />
-        <LiveStatsSection />
-        <ComparisonTable />
-        <CTASection />
-        <Footer />
-      </main>
-    </div>
+    <SmoothScroll>
+      <div className="landing-wrap">
+        <ParticlesField />
+        <div className="landing-frame">
+          <Header />
+          <main className="landing-main">
+            <div className="shell">
+              <HeroSection
+                publicDomain={publicDomain}
+                sampleSubdomain={sampleSubdomain}
+                samplePort={samplePort}
+              />
+              <HowItWorks sampleSubdomain={sampleSubdomain} publicDomain={publicDomain} />
+            </div>
+            <ProductPreview
+              publicDomain={publicDomain}
+              sampleSubdomain={sampleSubdomain}
+              samplePort={samplePort}
+            />
+            <div className="shell">
+              <ComparisonTable />
+            </div>
+          </main>
+          <Footer />
+        </div>
+      </div>
+    </SmoothScroll>
   );
 }

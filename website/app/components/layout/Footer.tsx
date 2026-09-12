@@ -1,19 +1,24 @@
+import PortShareLogo from '../brand/PortShareLogo';
+
 export default function Footer() {
   return (
-    <footer style={{ borderTop: '1px solid var(--border)', padding: '40px 0', marginTop: '48px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <span>© {new Date().getFullYear()} PortShare. Built by <a href="https://kexoz.dev" target="_blank" rel="noreferrer" style={{ color: 'var(--text)', textDecoration: 'none', fontWeight: 600 }}>Kexoz</a></span>
-        <div style={{ display: 'flex', gap: '12px', fontSize: '0.75rem' }}>
-          <a href="/terms" style={{ color: 'var(--text-soft)', textDecoration: 'none' }}>Terms of Service</a>
-          <a href="/privacy" style={{ color: 'var(--text-soft)', textDecoration: 'none' }}>Privacy Policy</a>
-          <a href="/abuse" style={{ color: 'var(--accent-red, #ef4444)', textDecoration: 'none', fontWeight: 500 }}>Report Abuse</a>
-        </div>
+    <footer className="site-footer">
+      <div className="footer-brand-row">
+        <a href="/" className="site-brand footer-brand-link">
+          <PortShareLogo size={24} />
+          PortShare
+        </a>
+        <span className="footer-copy-inline">
+          © {new Date().getFullYear()} · Built by{' '}
+          <a href="https://kexoz.dev" target="_blank" rel="noreferrer">Kexoz</a>
+        </span>
       </div>
-      <nav style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-        <a href="https://github.com/jagadesh31/Portshare" target="_blank" rel="noreferrer" style={{ color: 'var(--text-muted)', textDecoration: 'none', transition: 'color 0.2s' }}>GitHub</a>
-        <a href="https://twitter.com/kexoz" target="_blank" rel="noreferrer" style={{ color: 'var(--text-muted)', textDecoration: 'none', transition: 'color 0.2s' }}>Twitter / X</a>
-        <a href="/pricing" style={{ color: 'var(--text-muted)', textDecoration: 'none', transition: 'color 0.2s' }}>Pricing</a>
-        <a href="/download/portshare-desktop" style={{ color: 'var(--text-muted)', textDecoration: 'none', transition: 'color 0.2s' }}>Download</a>
+      <nav className="footer-links">
+        <a href="/terms" className="footer-link">Terms</a>
+        <a href="/privacy" className="footer-link">Privacy</a>
+        <a href="/abuse" className="footer-link">Report abuse</a>
+        <a href="https://github.com/jagadesh31/Portshare" target="_blank" rel="noreferrer" className="footer-link">GitHub</a>
+        <a href="/pricing" className="footer-link">Pricing</a>
       </nav>
     </footer>
   );

@@ -1,39 +1,71 @@
-import SectionHeader from "../ui/SectionHeader";
+'use client';
 
-export default function HowItWorks({ sampleSubdomain, publicDomain }: { sampleSubdomain: string, publicDomain: string }) {
+import { useEffect, useRef } from 'react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+gsap.registerPlugin(ScrollTrigger);
+
+export default function HowItWorks({ sampleSubdomain, publicDomain }: { sampleSubdomain: string; publicDomain: string }) {
+  const rootRef = useRef<HTMLElement>(null);
+
+  const steps = [
+    { n: '01', title: 'Install', body: 'Download the Windows desktop app.' },
+    { n: '02', title: 'Claim', body: `Reserve ${sampleSubdomain}.${publicDomain}` },
+    { n: '03', title: 'Expose', body: 'Point it at any local port and go live.' },
+  ];
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        root.querySelector('.steps-intro'),
+        { opacity: 0, y: 24 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.75,
+          ease: 'power3.out',
+          scrollTrigger: { trigger: root, start: 'top 80%' },
+        },
+      );
+
+      gsap.fromTo(
+        root.querySelectorAll('.step'),
+        { opacity: 0, y: 28 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.7,
+          stagger: 0.12,
+          ease: 'power3.out',
+          scrollTrigger: { trigger: root.querySelector('.steps-list'), start: 'top 85%' },
+        },
+      );
+    }, root);
+
+    return () => ctx.revert();
+  }, []);
+
   return (
-    <section id="how-it-works-section">
-      <SectionHeader 
-        id="how-it-works"
-        eyebrow="How it works"
-        title="Up and running in 30 seconds"
-        description="Three simple steps from install to public URL. No DNS wrangling, no YAML, no tears."
-      />
-      <div className="flow-grid" style={{ marginTop: '40px' }}>
-        {[
-          {
-            step: "01",
-            title: "Install & identify",
-            body: "Download the desktop app or grab the CLI. On first launch, PortShare generates a unique client identity and stores it locally for future sessions.",
-          },
-          {
-            step: "02",
-            title: "Claim your subdomain",
-            body: `Pick a memorable name — like ${sampleSubdomain}.${publicDomain}. It's yours permanently. No more broken webhook URLs when you restart.`,
-          },
-          {
-            step: "03",
-            title: "Expose any port",
-            body: "Enter the local port your dev server is running on. Your app is now live at your public URL — copy it and share anywhere.",
-          },
-        ].map((card) => (
-          <article key={card.step} className="flow-card">
-            <span className="flow-step-badge">{card.step}</span>
-            <h2>{card.title}</h2>
-            <p>{card.body}</p>
-          </article>
-        ))}
+    <section id="how-it-works" className="steps" ref={rootRef}>
+      <div className="steps-intro">
+        <span className="eyebrow">How it works</span>
+        <h2>Three steps to a public URL</h2>
       </div>
+      <ol className="steps-list">
+        {steps.map((step) => (
+          <li key={step.n} className="step">
+            <span className="step-n">{step.n}</span>
+            <div className="step-body">
+              <strong>{step.title}</strong>
+              <p>{step.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

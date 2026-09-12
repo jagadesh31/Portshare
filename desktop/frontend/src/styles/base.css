@@ -61,14 +61,15 @@ body {
   width: 30px;
   height: 30px;
   border-radius: var(--radius-sm);
-  background: var(--text-strong);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow: hidden;
   flex-shrink: 0;
 }
 
-.ps-brand-icon svg { color: var(--bg-app); }
+.ps-brand-icon img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
 
 .ps-brand-name {
   font-size: 14px;
@@ -739,6 +740,95 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/* ─── SPLASH / LOADING ────────────────────────────────── */
+.ps-splash {
+  flex: 1;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: var(--bg-app);
+}
+
+.ps-splash-theme {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ps-splash-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  animation: ps-splash-fade 0.5s var(--ease-out) both;
+}
+
+.ps-splash-logo-wrap {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ps-splash-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  animation: ps-logo-pop 0.7s var(--ease-spring) both;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+
+.ps-splash-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 22px;
+  border: 2px solid transparent;
+  border-top-color: var(--accent);
+  border-right-color: var(--border-bright);
+  animation: spin 0.9s linear infinite;
+}
+
+.ps-splash-brand {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text-strong);
+  animation: ps-splash-fade 0.5s var(--ease-out) 0.15s both;
+}
+
+.ps-splash-status {
+  font-size: 12.5px;
+  color: var(--text-soft);
+  max-width: 280px;
+  line-height: 1.45;
+  animation: ps-splash-fade 0.5s var(--ease-out) 0.25s both;
+}
+
+.ps-splash-inner.has-error .ps-splash-ring { display: none; }
+
+@keyframes ps-logo-pop {
+  0% { transform: scale(0.72); opacity: 0; }
+  60% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes ps-splash-fade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ─── LOADING SCREEN ──────────────────────────────────────── */
