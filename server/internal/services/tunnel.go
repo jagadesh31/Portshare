@@ -425,8 +425,12 @@ func HandlePublicTunnel(c *gin.Context) {
 			return
 		}
 		for name, values := range response.Headers {
+			lower := strings.ToLower(name)
+			if lower == "content-length" || lower == "transfer-encoding" || lower == "connection" {
+				continue
+			}
 			for _, value := range values {
-				c.Header(name, value)
+				c.Writer.Header().Add(name, value)
 			}
 		}
 		decoded, decodeErr := base64.StdEncoding.DecodeString(response.Body)
@@ -436,7 +440,14 @@ func HandlePublicTunnel(c *gin.Context) {
 			return
 		}
 		recordRequestStats(clientID, response.Status, int64(len(body)), int64(len(decoded)))
-		c.Data(response.Status, "application/octet-stream", decoded)
+		status := response.Status
+		if status < 100 {
+			status = http.StatusBadGateway
+		}
+		c.Status(status)
+		if _, writeErr := c.Writer.Write(decoded); writeErr != nil {
+			return
+		}
 	case <-time.After(60 * time.Second):
 		recordRequestStats(clientID, http.StatusGatewayTimeout, int64(len(body)), 0)
 		c.JSON(http.StatusGatewayTimeout, gin.H{"message": "desktop tunnel response timed out"})

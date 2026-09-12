@@ -1,7 +1,7 @@
 {
   "name": "portshare",
   "productName": "PortShare",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "PortShare desktop tunnel client",
   "main": "src/main.js",
   "private": true,

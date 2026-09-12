@@ -9,6 +9,58 @@ type CreateTunnelArgs = {
   onLogEntry: (entry: RequestLogEntry) => void
 }
 
+const SKIP_HEADERS = new Set([
+  'host',
+  'connection',
+  'content-length',
+  'transfer-encoding',
+  'keep-alive',
+  'te',
+  'trailer',
+  'upgrade',
+  'accept-encoding',
+  'origin',
+  'referer',
+])
+
+function flattenHeaders(headers: Record<string, string[]> | undefined): Record<string, string> {
+  const localHeaders: Record<string, string> = {}
+  Object.entries(headers ?? {}).forEach(([key, value]) => {
+    if (SKIP_HEADERS.has(key.toLowerCase())) return
+    localHeaders[key] = value.join(', ')
+  })
+  return localHeaders
+}
+
+async function proxyToLocal(port: number, request: TunnelRequest, localHeaders: Record<string, string>) {
+  const bodyBase64 = request.body || undefined
+
+  if (window.portshare?.localRequest) {
+    return window.portshare.localRequest({
+      port,
+      method: request.method,
+      path: request.path,
+      headers: localHeaders,
+      bodyBase64,
+    })
+  }
+
+  const requestBytes = fromBase64(request.body ?? '')
+  const response = await fetch(`http://127.0.0.1:${port}${request.path}`, {
+    method: request.method,
+    headers: localHeaders,
+    body: request.method === 'GET' || request.method === 'HEAD' ? undefined : new Blob([requestBytes.buffer as ArrayBuffer]),
+  })
+  const responseBody = new Uint8Array(await response.arrayBuffer())
+  const headers: Record<string, string[]> = {}
+  response.headers.forEach((value, name) => { headers[name] = [value] })
+  return {
+    status: response.status,
+    headers,
+    body: toBase64(responseBody),
+  }
+}
+
 export function createTunnelConnection({ apiBaseUrl, clientId, portRef, onStateChange, onLogEntry }: CreateTunnelArgs) {
   let shouldReconnect = true
   let tunnelSocket: WebSocket | null = null
@@ -33,52 +85,49 @@ export function createTunnelConnection({ apiBaseUrl, clientId, portRef, onStateC
       const request = JSON.parse(event.data) as TunnelRequest
       const port = portRef.current
       const startMs = Date.now()
+      const localHeaders = flattenHeaders(request.headers)
 
       if (!port) {
         socket.send(JSON.stringify({ id: request.id, status: 503, headers: {}, error: 'No local port configured' }))
-        onLogEntry({ 
-          id: request.id, method: request.method, path: request.path, status: 503, 
-          timestamp: new Date().toISOString(), durationMs: 0 
+        onLogEntry({
+          id: request.id, method: request.method, path: request.path, status: 503,
+          timestamp: new Date().toISOString(), durationMs: 0
         })
         return
       }
 
-      const localHeaders: Record<string, string> = {}
       try {
-        Object.entries(request.headers).forEach(([k, v]) => { localHeaders[k] = v.join(', ') })
-        const requestBytes = fromBase64(request.body ?? '')
-        const response = await fetch(`http://127.0.0.1:${port}${request.path}`, {
-          method: request.method,
-          headers: localHeaders,
-          body: request.method === 'GET' || request.method === 'HEAD' ? undefined : new Blob([requestBytes.buffer as ArrayBuffer]),
-        })
-        const responseBody = new Uint8Array(await response.arrayBuffer())
-        const headers: Record<string, string[]> = {}
-        response.headers.forEach((value, name) => { headers[name] = [value] })
+        const result = await proxyToLocal(port, request, localHeaders)
         if (socket.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({ id: request.id, status: response.status, headers, body: toBase64(responseBody) }))
+          socket.send(JSON.stringify({
+            id: request.id,
+            status: result.status,
+            headers: result.headers,
+            body: result.body,
+          }))
         }
-        
+
         let decodedBody = ''
         if (request.body) {
           try {
             decodedBody = new TextDecoder().decode(fromBase64(request.body))
-          } catch (e) {
+          } catch {
             decodedBody = '(binary or invalid text data)'
           }
         }
-        
-        onLogEntry({ 
-          id: request.id, method: request.method, path: request.path, status: response.status, 
+
+        onLogEntry({
+          id: request.id, method: request.method, path: request.path, status: result.status,
           timestamp: new Date().toISOString(), durationMs: Date.now() - startMs,
           headers: localHeaders, body: decodedBody
         })
       } catch (error) {
+        const message = error instanceof Error ? error.message : 'Local service unavailable'
         if (socket.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({ id: request.id, status: 502, headers: {}, error: error instanceof Error ? error.message : 'Local service unavailable' }))
+          socket.send(JSON.stringify({ id: request.id, status: 502, headers: {}, error: message }))
         }
-        onLogEntry({ 
-          id: request.id, method: request.method, path: request.path, status: 502, 
+        onLogEntry({
+          id: request.id, method: request.method, path: request.path, status: 502,
           timestamp: new Date().toISOString(), durationMs: Date.now() - startMs,
           headers: localHeaders
         })
