@@ -36,10 +36,10 @@ function AnimatedNumber({ value, decimals = 0 }: { value: number; decimals?: num
 
 export default function LiveStatsSection() {
   const [stats, setStats] = useState<Stats>({
-    totalRequests: 1_284_931,
-    activeTunnels: 3_247,
-    developers: 892,
-    dataProxiedGB: 48.3,
+    totalRequests: 0,
+    activeTunnels: 0,
+    developers: 0,
+    dataProxiedGB: 0,
   });
 
   // Poll the API for live stats every 10s
@@ -70,7 +70,7 @@ export default function LiveStatsSection() {
     <section id="stats" style={{ marginBottom: '140px' }}>
       <div style={{ textAlign: 'center', marginBottom: '40px' }}>
         <span className="section-eyebrow">Live Stats</span>
-        <h2 style={{ margin: '12px 0 8px', fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', fontWeight: 800, letterSpacing: '-0.04em', color: '#fff' }}>
+        <h2 style={{ margin: '12px 0 8px', fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', fontWeight: 800, letterSpacing: '-0.04em', color: 'var(--text-strong)' }}>
           Trusted by developers worldwide
         </h2>
         <p style={{ color: 'var(--text-muted)', maxWidth: '48ch', margin: '0 auto', lineHeight: 1.65, fontSize: '1rem' }}>

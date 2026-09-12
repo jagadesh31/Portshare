@@ -93,11 +93,15 @@ npm run dev
 
 ### Running the Desktop Client
 ```bash
-cd desktop
+cd desktop/frontend
+# copy .env.example to .env if needed
 npm install
+cd ../electron
+npm install
+cd ..
 npm run dev
 ```
-*This will spin up the Vite dev server and launch the Electron application.*
+*Vite serves the UI on port 5173 and Electron loads it. For a production installer: `cd desktop/electron && npm run make` (requires the same `VITE_*` env vars as CI).*
 
 ---
 

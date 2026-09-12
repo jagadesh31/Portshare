@@ -1,5 +1,5 @@
 import { type FormEvent } from 'react'
-import { Link2, Plus, Play, Square, Copy, ExternalLink, Check } from 'lucide-react'
+import { Link2, Plus, Copy, ExternalLink, Check } from 'lucide-react'
 import type { ClientSession, ConnectionState } from '../../lib/api'
 import { ROOT_DOMAIN } from '../../lib/api'
 
@@ -83,17 +83,6 @@ export default function TunnelsPage({
                       <ExternalLink size={12} />
                     </a>
                   </>
-                )}
-                {isConnected ? (
-                  <button className="ps-btn ps-btn-danger ps-btn-sm">
-                    <Square size={10} fill="currentColor" />
-                    Stop
-                  </button>
-                ) : (
-                  <button className="ps-btn ps-btn-success ps-btn-sm" disabled={isBusy}>
-                    <Play size={10} fill="currentColor" />
-                    Start
-                  </button>
                 )}
               </div>
             </div>

@@ -1,12 +1,13 @@
 {
   "name": "portshare",
   "productName": "PortShare",
-  "version": "1.0.9",
-  "description": "My Electron application description",
+  "version": "1.1.0",
+  "description": "PortShare desktop tunnel client",
   "main": "src/main.js",
   "private": true,
   "scripts": {
     "start": "electron-forge start",
+    "dev": "concurrently -k \"npm --prefix ../frontend run dev\" \"wait-on tcp:127.0.0.1:5173 && electron-forge start\"",
     "package": "npm --prefix ../frontend run build && electron-forge package",
     "make": "npm --prefix ../frontend run build && electron-forge make",
     "publish": "electron-forge publish",
@@ -30,10 +31,12 @@
     "@electron-forge/publisher-github": "^7.11.2",
     "@electron/fuses": "^1.8.0",
     "@vercel/webpack-asset-relocator-loader": "^1.7.3",
+    "concurrently": "^9.2.1",
     "css-loader": "^6.11.0",
     "electron": "41.1.1",
     "node-loader": "^2.1.0",
-    "style-loader": "^3.3.4"
+    "style-loader": "^3.3.4",
+    "wait-on": "^8.0.5"
   },
   "dependencies": {
     "electron-squirrel-startup": "^1.0.1"

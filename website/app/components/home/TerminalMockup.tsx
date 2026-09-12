@@ -75,7 +75,7 @@ export default function TerminalMockup({ samplePort, sampleUrl }: { samplePort: 
         <br />
 
         <div className="terminal-line">
-          <span className="term-cmd" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>Public URL</span>
+          <span className="term-cmd" style={{ color: 'var(--text-soft)', fontSize: '0.75rem' }}>Public URL</span>
         </div>
         <div className="terminal-line" style={{ marginTop: -4 }}>
           <span className="term-url" style={{ fontWeight: 700 }}>{sampleUrl}</span>

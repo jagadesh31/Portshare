@@ -7,7 +7,7 @@ export default function FeaturesGrid({ publicDomain }: { publicDomain: string })
       icon: <Search size={22} />,
       tag: 'Built-in',
       title: 'Request Inspector',
-      body: 'See every HTTP request hitting your tunnel in real-time. Replay with one click.',
+      body: 'See every HTTP request hitting your tunnel in real time — method, path, status, and duration.',
     },
     {
       icon: <Globe size={22} />,
@@ -31,7 +31,7 @@ export default function FeaturesGrid({ publicDomain }: { publicDomain: string })
       icon: <Terminal size={22} />,
       tag: 'Zero Install',
       title: 'SSH Tunnels',
-      body: 'Use native SSH: ssh -R 80:localhost:3000 portshare.kexoz.dev. No client required.',
+      body: `Use native SSH: ssh -R 80:localhost:3000 ${publicDomain}. No extra client required.`,
     },
     {
       icon: <Shield size={22} />,
@@ -48,8 +48,8 @@ export default function FeaturesGrid({ publicDomain }: { publicDomain: string })
     {
       icon: <Clock size={22} />,
       tag: 'History',
-      title: 'Instant Replay',
-      body: 'Scroll through history and replay any call instantly to debug webhooks.',
+      title: 'Session log',
+      body: 'Keep a live log of traffic for the current session while you debug webhooks and APIs.',
     },
   ];
 

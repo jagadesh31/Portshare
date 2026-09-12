@@ -4,7 +4,7 @@ import FeatureCheck from '../ui/FeatureCheck';
 const comparisonData = [
   { feature: 'Permanent subdomains',       portshare: 'yes',   ngrok: 'yes',      cloudflare: 'yes'     },
   { feature: 'Custom domain (BYOD)',        portshare: 'yes',   ngrok: 'Paid only', cloudflare: 'yes'    },
-  { feature: 'Request inspector + replay', portshare: 'yes',   ngrok: 'yes',      cloudflare: 'no'      },
+  { feature: 'Request inspector',          portshare: 'yes',   ngrok: 'yes',      cloudflare: 'no'      },
   { feature: 'Desktop GUI client',         portshare: 'yes',   ngrok: 'no',       cloudflare: 'no'      },
   { feature: 'Zero-install SSH tunnel',    portshare: 'yes',   ngrok: 'no',       cloudflare: 'no'      },
   { feature: 'Self-hostable',              portshare: 'yes',   ngrok: 'no',       cloudflare: 'no'      },

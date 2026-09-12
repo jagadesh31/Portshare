@@ -159,26 +159,16 @@ export default function RequestsPage({ requestLog, onClear }: Props) {
                 {activeTab === 'timing' && (
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
-                      Timing Breakdown
+                      Timing
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {[
-                        { label: 'DNS Lookup', ms: 2 },
-                        { label: 'TCP Connect', ms: 4 },
-                        { label: 'TLS Handshake', ms: 8 },
-                        { label: 'Server Processing', ms: selected.durationMs ?? 12 },
-                        { label: 'Transfer', ms: 1 },
-                      ].map(({ label, ms }) => (
-                        <div key={label}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 11.5, color: 'var(--text-muted)' }}>
-                            <span>{label}</span>
-                            <span style={{ fontFamily: 'var(--mono-font)' }}>{ms}ms</span>
-                          </div>
-                          <div className="ps-bandwidth-bar">
-                            <div className="ps-bandwidth-fill" style={{ width: `${Math.min(100, (ms / ((selected.durationMs ?? 30) + 15)) * 100)}%` }} />
-                          </div>
-                        </div>
-                      ))}
+                    <div className="ps-code">
+                      <div>
+                        <span style={{ color: 'var(--text-muted)' }}>Round trip:</span>{' '}
+                        {selected.durationMs != null ? `${selected.durationMs}ms` : '—'}
+                      </div>
+                      <div style={{ color: 'var(--text-soft)', marginTop: 8 }}>
+                        This is the time to proxy the request to localhost and return the response. Fine-grained DNS/TLS splits are not recorded.
+                      </div>
                     </div>
                   </div>
                 )}

@@ -36,11 +36,11 @@ export default function App() {
   const [step, setStep] = useState<FlowStep>('loading')
   const [activePage, setActivePage] = useState<Page>('dashboard')
   const [session, setSession] = useState<ClientSession | null>(null)
-  
+
   const [subdomainInput, setSubdomainInput] = useState('')
   const [portInput, setPortInput] = useState('')
   const [domainInput, setDomainInput] = useState('')
-  
+
   const [statusMessage, setStatusMessage] = useState('Starting secure tunnel client...')
   const [infoMessage, setInfoMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
@@ -48,6 +48,9 @@ export default function App() {
   const [copyFeedback, setCopyFeedback] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [connState, setConnState] = useState<ConnectionState>('idle')
   const [gauthEnabled, setGauthEnabled] = useState(false)
+  const [connectedAt, setConnectedAt] = useState<number | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+  const [showNewTunnel, setShowNewTunnel] = useState(false)
 
   const { theme, toggleTheme } = useTheme()
   const { requestLog, totalRequests, addLogEntry, clearLog } = useRequestLog()
@@ -59,6 +62,16 @@ export default function App() {
     if (!session?.subdomain) return ''
     return `https://${session.subdomain}.${ROOT_DOMAIN}`
   }, [session])
+
+  const uptimeSeconds = connectedAt && connState === 'connected'
+    ? Math.max(0, Math.floor((now - connectedAt) / 1000))
+    : 0
+
+  useEffect(() => {
+    if (connState !== 'connected') return
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [connState])
 
   const bootstrapClient = useCallback(async (): Promise<void> => {
     setStep('loading')
@@ -86,6 +99,8 @@ export default function App() {
         portRef: tunnelPort,
         onStateChange: (state, message) => {
           setConnState(state)
+          if (state === 'connected') setConnectedAt(Date.now())
+          if (state === 'disconnected') setConnectedAt(null)
           if (message) setStatusMessage(message)
         },
         onLogEntry: addLogEntry
@@ -94,11 +109,13 @@ export default function App() {
 
       if (nextSession.subdomain.length > 0) {
         setStep('dashboard')
-        setInfoMessage('Identity loaded. You can expose any local port now.')
+        setInfoMessage('Identity loaded. Set a local port to start forwarding.')
         try {
           const { data: authStatus } = await axios.get<{ enabled: boolean }>(`${API_BASE_URL}/auth/google/status`)
           setGauthEnabled(authStatus.enabled)
-        } catch {}
+        } catch {
+          setGauthEnabled(false)
+        }
       } else {
         setStep('subdomain')
         setInfoMessage('Identity created. Reserve your subdomain to continue.')
@@ -106,7 +123,7 @@ export default function App() {
     } catch (error) {
       setConnState('disconnected')
       setErrorMessage(extractError(error))
-      setStatusMessage('Could not connect to your PortShare API server.')
+      setStatusMessage('Could not reach the PortShare API.')
     } finally {
       setIsBusy(false)
     }
@@ -119,6 +136,21 @@ export default function App() {
       tunnelClose.current = null
     }
   }, [bootstrapClient])
+
+  const applyPort = async (port: number) => {
+    if (!session) return
+    setIsBusy(true); setErrorMessage(''); setInfoMessage('Updating exposed port...')
+    try {
+      const next = await updateExposedPort(session.id, port)
+      tunnelPort.current = next
+      setSession(cur => cur ? { ...cur, port: next } : cur)
+      setPortInput(String(next))
+      setInfoMessage(`localhost:${next} is now routed to your public URL.`)
+      toast.success(`Forwarding localhost:${next}`)
+    } catch (err) {
+      setErrorMessage(extractError(err))
+    } finally { setIsBusy(false) }
+  }
 
   const handleSubdomainSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -137,7 +169,7 @@ export default function App() {
       await claimSubdomain(session.id, name)
       setSession(cur => cur ? { ...cur, subdomain: name } : cur)
       setStep('dashboard')
-      setInfoMessage('Subdomain reserved successfully.')
+      setInfoMessage('Subdomain reserved. Set a local port to go live.')
     } catch (err) {
       setErrorMessage(extractError(err))
     } finally { setIsBusy(false) }
@@ -145,23 +177,12 @@ export default function App() {
 
   const handlePortSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!session) return
     const p = Number(portInput)
     if (!Number.isInteger(p) || p < 1 || p > 65535) {
       setErrorMessage('Enter a valid TCP port between 1 and 65535.')
       return
     }
-    setIsBusy(true); setErrorMessage(''); setInfoMessage('Updating exposed port...')
-    try {
-      const next = await updateExposedPort(session.id, p)
-      tunnelPort.current = next
-      setSession(cur => cur ? { ...cur, port: next } : cur)
-      setPortInput(String(next))
-      setInfoMessage(`Port ${next} is now routed to your public URL.`)
-      toast.success(`Port ${next} is now exposed!`)
-    } catch (err) {
-      setErrorMessage(extractError(err))
-    } finally { setIsBusy(false) }
+    await applyPort(p)
   }
 
   const handleDomainSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -172,8 +193,8 @@ export default function App() {
       const customDomain = await updateCustomDomain(session.id, domainInput.trim())
       setSession(cur => cur ? { ...cur, customDomain } : cur)
       setDomainInput(customDomain)
-      setInfoMessage('Domain mapped. Add a CNAME record pointing to your PortShare endpoint.')
-      toast.success('Custom domain mapped!')
+      setInfoMessage('Domain mapped. Add a CNAME pointing to your PortShare hostname.')
+      toast.success('Custom domain mapped')
     } catch (err) {
       setErrorMessage(extractError(err))
     } finally { setIsBusy(false) }
@@ -188,8 +209,8 @@ export default function App() {
       setSession(cur => cur ? { ...cur, requireAuth: result.requireAuth } : cur)
       setGauthEnabled(result.gauthEnabled)
       setInfoMessage(result.requireAuth
-        ? '🔒 Google Auth wall enabled — visitors must sign in with Google.'
-        : '🔓 Google Auth wall disabled — tunnel is publicly accessible.')
+        ? 'Google Auth wall enabled — visitors must sign in with Google.'
+        : 'Google Auth wall disabled — tunnel is publicly accessible.')
       toast.success(result.requireAuth ? 'Auth wall enabled' : 'Auth wall disabled')
     } catch (err) {
       setErrorMessage(extractError(err))
@@ -201,7 +222,7 @@ export default function App() {
     try {
       await navigator.clipboard.writeText(publicUrl)
       setCopyFeedback('copied')
-      toast.success('URL copied to clipboard!')
+      toast.success('URL copied')
     } catch {
       setCopyFeedback('failed')
     }
@@ -210,7 +231,7 @@ export default function App() {
 
   return (
     <>
-      <Toaster position="bottom-right" />
+      <Toaster position="bottom-right" toastOptions={{ style: { fontSize: 13 } }} />
       <AppShell>
         {step === 'dashboard' && session && (
           <Sidebar
@@ -223,24 +244,27 @@ export default function App() {
             onToggleTheme={toggleTheme}
           />
         )}
-        
+
         {step === 'loading' && (
-          <LoadingScreen key="loading" statusMessage={statusMessage} errorMessage={errorMessage} onRetry={() => void bootstrapClient()} />
+          <LoadingScreen
+            statusMessage={statusMessage}
+            errorMessage={errorMessage}
+            onRetry={() => void bootstrapClient()}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+          />
         )}
 
         {step === 'subdomain' && session && (
-          <main className="console-content">
-            <SubdomainScreen
-              key="subdomain"
-              session={session}
-              subdomainInput={subdomainInput}
-              setSubdomainInput={setSubdomainInput}
-              onSubmit={handleSubdomainSubmit}
-              isBusy={isBusy}
-              gauthEnabled={gauthEnabled}
-              onAuthToggle={handleAuthToggle}
-            />
-          </main>
+          <SubdomainScreen
+            session={session}
+            subdomainInput={subdomainInput}
+            setSubdomainInput={setSubdomainInput}
+            onSubmit={handleSubdomainSubmit}
+            isBusy={isBusy}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+          />
         )}
 
         {step === 'dashboard' && session && (
@@ -262,10 +286,18 @@ export default function App() {
                 onCopyUrl={handleCopyUrl}
                 copyFeedback={copyFeedback}
                 statusMessage={statusMessage}
-                uptimeSeconds={0}
+                uptimeSeconds={uptimeSeconds}
+                showNewTunnel={showNewTunnel}
+                onOpenNewTunnel={() => setShowNewTunnel(true)}
+                onCloseNewTunnel={() => setShowNewTunnel(false)}
+                onCreateTunnel={async (port) => {
+                  setPortInput(String(port))
+                  setShowNewTunnel(false)
+                  await applyPort(port)
+                }}
               />
             )}
-            
+
             {activePage === 'tunnels' && (
               <TunnelsPage
                 session={session}
@@ -276,7 +308,10 @@ export default function App() {
                 isBusy={isBusy}
                 onCopyUrl={handleCopyUrl}
                 copyFeedback={copyFeedback}
-                onNewTunnel={() => setActivePage('dashboard')}
+                onNewTunnel={() => {
+                  setActivePage('dashboard')
+                  setShowNewTunnel(true)
+                }}
               />
             )}
 
@@ -301,9 +336,10 @@ export default function App() {
               <SettingsPage
                 theme={theme}
                 onToggleTheme={toggleTheme}
+                session={session}
               />
             )}
-            
+
             <FeedbackBanner infoMessage={infoMessage} errorMessage={errorMessage} />
           </>
         )}

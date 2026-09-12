@@ -1,5 +1,5 @@
 'use client';
-import { Zap, Sun, Moon } from 'lucide-react';
+import { Sun, Moon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export default function Header() {
@@ -35,7 +35,11 @@ export default function Header() {
   return (
     <header className={`site-header ${scrolled ? 'scrolled' : ''}`}>
       <a href="/" className="site-brand">
-
+        <span className="site-brand-icon" aria-hidden>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-inverse)" strokeWidth="2.6">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+          </svg>
+        </span>
         PortShare
       </a>
 

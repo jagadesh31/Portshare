@@ -27,7 +27,6 @@ export default function Home() {
           publicDomain={publicDomain}
           sampleSubdomain={sampleSubdomain}
           samplePort={samplePort}
-          totalRequests={1284931}
         />
         <HowItWorks sampleSubdomain={sampleSubdomain} publicDomain={publicDomain} />
         <FeaturesGrid publicDomain={publicDomain} />

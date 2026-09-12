@@ -1,43 +1,36 @@
 import { useState } from 'react'
-import { User, Shield, Wifi, Monitor, Bell, Sliders } from 'lucide-react'
+import { Monitor, Shield, Wifi } from 'lucide-react'
+import type { ClientSession } from '../../lib/api'
+import { API_BASE_URL, ROOT_DOMAIN } from '../../lib/api'
 
-type SettingsSection = 'general' | 'account' | 'tunnel' | 'security' | 'appearance' | 'network'
+type SettingsSection = 'appearance' | 'tunnel' | 'account'
 
-const sections: { id: SettingsSection; label: string; icon: typeof User }[] = [
-  { id: 'general',    label: 'General',    icon: Sliders },
-  { id: 'account',    label: 'Account',    icon: User },
-  { id: 'tunnel',     label: 'Tunnel',     icon: Wifi },
-  { id: 'security',   label: 'Security',   icon: Shield },
+const sections: { id: SettingsSection; label: string; icon: typeof Monitor }[] = [
   { id: 'appearance', label: 'Appearance', icon: Monitor },
-  { id: 'network',    label: 'Network',    icon: Bell },
+  { id: 'tunnel',     label: 'Tunnel',     icon: Wifi },
+  { id: 'account',    label: 'Account',    icon: Shield },
 ]
 
 type Props = {
   theme: 'light' | 'dark'
   onToggleTheme: () => void
+  session: ClientSession
 }
 
-export default function SettingsPage({ theme, onToggleTheme }: Props) {
-  const [active, setActive] = useState<SettingsSection>('general')
-  const [autoReconnect, setAutoReconnect] = useState(true)
-  const [startOnLogin, setStartOnLogin] = useState(false)
-  const [notifications, setNotifications] = useState(true)
-  const [requireAuth, setRequireAuth] = useState(false)
-  const [logRequests, setLogRequests] = useState(true)
-  const [maxRetries, setMaxRetries] = useState('5')
+export default function SettingsPage({ theme, onToggleTheme, session }: Props) {
+  const [active, setActive] = useState<SettingsSection>('appearance')
 
   return (
     <div className="ps-main">
       <div className="ps-page-header animate-fade-down">
         <div>
           <h1 className="ps-page-title">Settings</h1>
-          <p className="ps-page-subtitle">Configure your PortShare preferences</p>
+          <p className="ps-page-subtitle">Preferences for this client</p>
         </div>
       </div>
 
       <div className="ps-page-content" style={{ flex: 1, overflow: 'hidden', padding: '16px 28px 28px' }}>
         <div className="ps-settings-layout ps-card animate-fade-up" style={{ height: 'calc(100vh - 160px)' }}>
-          {/* Settings Nav */}
           <div className="ps-settings-nav">
             {sections.map(({ id, label, icon: Icon }) => (
               <button
@@ -51,118 +44,14 @@ export default function SettingsPage({ theme, onToggleTheme }: Props) {
             ))}
           </div>
 
-          {/* Settings Content */}
           <div className="ps-settings-content">
-            {active === 'general' && (
-              <div className="ps-settings-section animate-fade-in">
-                <div className="ps-settings-section-title">General</div>
-                <div className="ps-settings-row">
-                  <div className="ps-settings-row-info">
-                    <div className="ps-settings-row-label">Start on Login</div>
-                    <div className="ps-settings-row-desc">Launch PortShare automatically when you log in</div>
-                  </div>
-                  <label className="ps-toggle">
-                    <input type="checkbox" checked={startOnLogin} onChange={() => setStartOnLogin(v => !v)} />
-                    <div className="ps-toggle-track" />
-                  </label>
-                </div>
-                <div className="ps-settings-row">
-                  <div className="ps-settings-row-info">
-                    <div className="ps-settings-row-label">Desktop Notifications</div>
-                    <div className="ps-settings-row-desc">Get notified when tunnel status changes</div>
-                  </div>
-                  <label className="ps-toggle">
-                    <input type="checkbox" checked={notifications} onChange={() => setNotifications(v => !v)} />
-                    <div className="ps-toggle-track" />
-                  </label>
-                </div>
-                <div className="ps-settings-row">
-                  <div className="ps-settings-row-info">
-                    <div className="ps-settings-row-label">Log Requests</div>
-                    <div className="ps-settings-row-desc">Record incoming requests in the Requests inspector</div>
-                  </div>
-                  <label className="ps-toggle">
-                    <input type="checkbox" checked={logRequests} onChange={() => setLogRequests(v => !v)} />
-                    <div className="ps-toggle-track" />
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {active === 'tunnel' && (
-              <div className="ps-settings-section animate-fade-in">
-                <div className="ps-settings-section-title">Tunnel</div>
-                <div className="ps-settings-row">
-                  <div className="ps-settings-row-info">
-                    <div className="ps-settings-row-label">Auto-Reconnect</div>
-                    <div className="ps-settings-row-desc">Automatically reconnect if the tunnel drops</div>
-                  </div>
-                  <label className="ps-toggle">
-                    <input type="checkbox" checked={autoReconnect} onChange={() => setAutoReconnect(v => !v)} />
-                    <div className="ps-toggle-track" />
-                  </label>
-                </div>
-                <div className="ps-settings-row">
-                  <div className="ps-settings-row-info">
-                    <div className="ps-settings-row-label">Max Reconnect Retries</div>
-                    <div className="ps-settings-row-desc">Number of reconnection attempts before giving up</div>
-                  </div>
-                  <input
-                    type="number"
-                    className="ps-input ps-input-mono"
-                    value={maxRetries}
-                    onChange={e => setMaxRetries(e.target.value)}
-                    min={1}
-                    max={100}
-                    style={{ width: 80 }}
-                  />
-                </div>
-                <div className="ps-settings-row">
-                  <div className="ps-settings-row-info">
-                    <div className="ps-settings-row-label">Default Protocol</div>
-                    <div className="ps-settings-row-desc">Protocol for new tunnels</div>
-                  </div>
-                  <select className="ps-select">
-                    <option value="https">HTTPS</option>
-                    <option value="http">HTTP</option>
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {active === 'security' && (
-              <div className="ps-settings-section animate-fade-in">
-                <div className="ps-settings-section-title">Security</div>
-                <div className="ps-settings-row">
-                  <div className="ps-settings-row-info">
-                    <div className="ps-settings-row-label">Require Authentication</div>
-                    <div className="ps-settings-row-desc">Protect tunnels with Google OAuth by default</div>
-                  </div>
-                  <label className="ps-toggle">
-                    <input type="checkbox" checked={requireAuth} onChange={() => setRequireAuth(v => !v)} />
-                    <div className="ps-toggle-track" />
-                  </label>
-                </div>
-                <div className="ps-settings-row">
-                  <div className="ps-settings-row-info">
-                    <div className="ps-settings-row-label">SSH Tunneling</div>
-                    <div className="ps-settings-row-desc">Allow native SSH -R reverse tunnels (no client install needed)</div>
-                  </div>
-                  <label className="ps-toggle">
-                    <input type="checkbox" defaultChecked={true} />
-                    <div className="ps-toggle-track" />
-                  </label>
-                </div>
-              </div>
-            )}
-
             {active === 'appearance' && (
               <div className="ps-settings-section animate-fade-in">
                 <div className="ps-settings-section-title">Appearance</div>
                 <div className="ps-settings-row">
                   <div className="ps-settings-row-info">
                     <div className="ps-settings-row-label">Theme</div>
-                    <div className="ps-settings-row-desc">Choose between dark and light modes</div>
+                    <div className="ps-settings-row-desc">Dark and light modes for this device</div>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button
@@ -179,16 +68,36 @@ export default function SettingsPage({ theme, onToggleTheme }: Props) {
                     </button>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {active === 'tunnel' && (
+              <div className="ps-settings-section animate-fade-in">
+                <div className="ps-settings-section-title">Tunnel</div>
                 <div className="ps-settings-row">
                   <div className="ps-settings-row-info">
-                    <div className="ps-settings-row-label">Sidebar Width</div>
-                    <div className="ps-settings-row-desc">Adjust the sidebar navigation width</div>
+                    <div className="ps-settings-row-label">Reconnect</div>
+                    <div className="ps-settings-row-desc">The client reconnects automatically if the socket drops</div>
                   </div>
-                  <select className="ps-select">
-                    <option value="compact">Compact (180px)</option>
-                    <option value="default" selected>Default (220px)</option>
-                    <option value="wide">Wide (260px)</option>
-                  </select>
+                  <span className="ps-badge ps-badge-green">On</span>
+                </div>
+                <div className="ps-settings-row">
+                  <div className="ps-settings-row-info">
+                    <div className="ps-settings-row-label">API</div>
+                    <div className="ps-settings-row-desc">Control plane used by this build</div>
+                  </div>
+                  <span style={{ fontFamily: 'var(--mono-font)', fontSize: 11.5, color: 'var(--text-soft)' }}>
+                    {API_BASE_URL.replace(/^https?:\/\//, '')}
+                  </span>
+                </div>
+                <div className="ps-settings-row">
+                  <div className="ps-settings-row-info">
+                    <div className="ps-settings-row-label">Root domain</div>
+                    <div className="ps-settings-row-desc">Public hostname suffix for tunnels</div>
+                  </div>
+                  <span style={{ fontFamily: 'var(--mono-font)', fontSize: 11.5, color: 'var(--text-soft)' }}>
+                    {ROOT_DOMAIN}
+                  </span>
                 </div>
               </div>
             )}
@@ -199,54 +108,25 @@ export default function SettingsPage({ theme, onToggleTheme }: Props) {
                 <div className="ps-settings-row">
                   <div className="ps-settings-row-info">
                     <div className="ps-settings-row-label">Plan</div>
-                    <div className="ps-settings-row-desc">Your current PortShare subscription</div>
+                    <div className="ps-settings-row-desc">Current bandwidth plan for this identity</div>
                   </div>
-                  <span className="ps-badge ps-badge-purple">Free</span>
+                  <span className="ps-badge ps-badge-gray" style={{ textTransform: 'capitalize' }}>{session.plan}</span>
                 </div>
                 <div className="ps-settings-row">
                   <div className="ps-settings-row-info">
-                    <div className="ps-settings-row-label">Bandwidth Limit</div>
-                    <div className="ps-settings-row-desc">Monthly data transfer cap for your plan</div>
+                    <div className="ps-settings-row-label">Client ID</div>
+                    <div className="ps-settings-row-desc">Stored locally on this machine</div>
                   </div>
-                  <span style={{ fontFamily: 'var(--mono-font)', fontSize: 12, color: 'var(--text-muted)' }}>1 GB</span>
-                </div>
-                <div className="ps-settings-row">
-                  <div className="ps-settings-row-info">
-                    <div className="ps-settings-row-label">Upgrade Plan</div>
-                    <div className="ps-settings-row-desc">Unlock unlimited bandwidth, custom domains, and more</div>
-                  </div>
-                  <button className="ps-btn ps-btn-primary ps-btn-sm">Upgrade</button>
-                </div>
-              </div>
-            )}
-
-            {active === 'network' && (
-              <div className="ps-settings-section animate-fade-in">
-                <div className="ps-settings-section-title">Network</div>
-                <div className="ps-settings-row">
-                  <div className="ps-settings-row-info">
-                    <div className="ps-settings-row-label">API Server</div>
-                    <div className="ps-settings-row-desc">PortShare API endpoint</div>
-                  </div>
-                  <span style={{ fontFamily: 'var(--mono-font)', fontSize: 11.5, color: 'var(--text-soft)' }}>
-                    api.portshare.kexoz.dev
+                  <span style={{ fontFamily: 'var(--mono-font)', fontSize: 11, color: 'var(--text-soft)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {session.id}
                   </span>
                 </div>
                 <div className="ps-settings-row">
                   <div className="ps-settings-row-info">
-                    <div className="ps-settings-row-label">SSH Server</div>
-                    <div className="ps-settings-row-desc">Zero-install SSH tunnel endpoint</div>
+                    <div className="ps-settings-row-label">Auth wall</div>
+                    <div className="ps-settings-row-desc">Google sign-in required for visitors</div>
                   </div>
-                  <span style={{ fontFamily: 'var(--mono-font)', fontSize: 11.5, color: 'var(--text-soft)' }}>
-                    portshare.kexoz.dev:22
-                  </span>
-                </div>
-                <div className="ps-settings-row">
-                  <div className="ps-settings-row-info">
-                    <div className="ps-settings-row-label">WebSocket Timeout</div>
-                    <div className="ps-settings-row-desc">How long to wait before reconnecting (ms)</div>
-                  </div>
-                  <input type="number" className="ps-input ps-input-mono" defaultValue={30000} style={{ width: 100 }} />
+                  <span className="ps-badge ps-badge-gray">{session.requireAuth ? 'Enabled' : 'Off'}</span>
                 </div>
               </div>
             )}

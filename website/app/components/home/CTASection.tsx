@@ -24,7 +24,7 @@ export default function CTASection() {
         </div>
         <p style={{ marginTop: 20, marginBottom: 0, fontSize: '0.8rem', color: 'var(--text-soft)' }}>
           Also available via{' '}
-          <code style={{ background: 'rgba(255,255,255,0.07)', padding: '2px 7px', borderRadius: '5px', fontFamily: 'var(--mono)', fontSize: '0.78rem', color: 'var(--accent-bright)' }}>
+          <code style={{ background: 'var(--accent-dim)', padding: '2px 7px', borderRadius: '5px', fontFamily: 'var(--mono)', fontSize: '0.78rem', color: 'var(--accent-bright)' }}>
             ssh -R 80:localhost:3000 portshare.kexoz.dev
           </code>
           {' '}— no install needed.

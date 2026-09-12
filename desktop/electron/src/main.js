@@ -1,43 +1,85 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, shell, protocol, net } = require('electron');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
   app.quit();
 }
 
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'portshare',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
+]);
+
+const VITE_DEV_URL = process.env.PORTSHARE_VITE_URL || 'http://127.0.0.1:5173';
+
 const createWindow = () => {
-  // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 1280,
+    height: 820,
+    minWidth: 960,
+    minHeight: 640,
+    title: 'PortShare',
+    backgroundColor: '#08090B',
+    show: false,
     autoHideMenuBar: true,
     webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
     },
   });
+
   mainWindow.setMenu(null);
 
-  const rendererPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'dist', 'index.html')
-    : path.join(__dirname, '../../frontend/dist/index.html');
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+  });
 
-  mainWindow.loadFile(rendererPath).catch(e => console.error("Failed to load file:", e));
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https:') || url.startsWith('http:')) {
+      void shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
 
-  if (!app.isPackaged && process.env.PORTSHARE_DEVTOOLS === 'true') {
-    mainWindow.webContents.openDevTools();
+  if (!app.isPackaged) {
+    mainWindow.loadURL(VITE_DEV_URL).catch(() => {
+      const fallback = path.join(__dirname, '../../frontend/dist/index.html');
+      void mainWindow.loadFile(fallback);
+    });
+    return;
   }
+
+  void mainWindow.loadURL('portshare://app/');
 };
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
+  if (app.isPackaged) {
+    const distRoot = path.join(process.resourcesPath, 'dist');
+    protocol.handle('portshare', (request) => {
+      const { pathname } = new URL(request.url);
+      let relative = decodeURIComponent(pathname);
+      if (!relative || relative === '/') relative = '/index.html';
+      const filePath = path.normalize(path.join(distRoot, relative.replace(/^[/\\]+/, '')));
+      if (!filePath.startsWith(distRoot)) {
+        return new Response('Forbidden', { status: 403 });
+      }
+      return net.fetch(pathToFileURL(filePath).toString());
+    });
+  }
+
   createWindow();
 
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -45,14 +87,8 @@ app.whenReady().then(() => {
   });
 });
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.

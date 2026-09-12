@@ -23,7 +23,21 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 	config := cors.DefaultConfig()
-	config.AllowOrigins = configuredOrigins()
+	allowed := configuredOrigins()
+	config.AllowOriginFunc = func(origin string) bool {
+		if origin == "" || origin == "null" {
+			return true
+		}
+		if strings.HasPrefix(origin, "file://") || strings.HasPrefix(origin, "portshare://") {
+			return true
+		}
+		for _, allowedOrigin := range allowed {
+			if allowedOrigin == "*" || allowedOrigin == origin {
+				return true
+			}
+		}
+		return false
+	}
 	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept"}
 	corsMiddleware := cors.New(config)
 	r.Use(func(c *gin.Context) {

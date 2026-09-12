@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Copy, ExternalLink, Activity, Zap, Clock, Database, Plus, Play, Square, RefreshCw, ChevronDown, ChevronUp, Check } from 'lucide-react'
+import { Copy, ExternalLink, Activity, Clock, Database, Plus, ChevronDown, ChevronUp, Check } from 'lucide-react'
 import type { ClientSession, ConnectionState } from '../../lib/api'
 import { ROOT_DOMAIN } from '../../lib/api'
 import NewTunnelModal from '../modals/NewTunnelModal'
@@ -21,6 +21,10 @@ type Props = {
   copyFeedback: 'idle' | 'copied' | 'failed'
   statusMessage: string
   uptimeSeconds: number
+  showNewTunnel: boolean
+  onOpenNewTunnel: () => void
+  onCloseNewTunnel: () => void
+  onCreateTunnel: (port: number) => void | Promise<void>
 }
 
 function formatBytes(bytes: number): string {
@@ -49,8 +53,8 @@ export default function DashboardPage({
   domainInput, setDomainInput, onDomainSubmit,
   gauthEnabled, onAuthToggle, isBusy,
   totalRequests, onCopyUrl, copyFeedback, statusMessage, uptimeSeconds,
+  showNewTunnel, onOpenNewTunnel, onCloseNewTunnel, onCreateTunnel,
 }: Props) {
-  const [showNewTunnel, setShowNewTunnel] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   const publicUrl = session?.subdomain
@@ -74,16 +78,12 @@ export default function DashboardPage({
           </p>
         </div>
         <div className="ps-header-actions">
-          <button className="ps-btn ps-btn-secondary ps-btn-sm" onClick={() => {}}>
-            <RefreshCw size={13} />
-            Refresh
-          </button>
           <button
             className="ps-btn ps-btn-primary ps-btn-sm"
-            onClick={() => setShowNewTunnel(true)}
+            onClick={onOpenNewTunnel}
           >
             <Plus size={13} />
-            New Tunnel
+            Set port
           </button>
         </div>
       </div>
@@ -120,17 +120,6 @@ export default function DashboardPage({
             </div>
             <div className="ps-header-actions">
               <span className={`ps-badge ${badge.cls}`}>{badge.label}</span>
-              {connState === 'connected' ? (
-                <button className="ps-btn ps-btn-danger ps-btn-sm">
-                  <Square size={11} fill="currentColor" />
-                  Stop
-                </button>
-              ) : (
-                <button className="ps-btn ps-btn-success ps-btn-sm" disabled={isBusy}>
-                  <Play size={11} fill="currentColor" />
-                  Start
-                </button>
-              )}
             </div>
           </div>
 
@@ -272,13 +261,13 @@ export default function DashboardPage({
           </div>
           <div className="ps-stat">
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
-              <span className="ps-stat-label">Avg Latency</span>
-              <Zap size={14} style={{ color: 'var(--text-soft)' }} />
+              <span className="ps-stat-label">Local port</span>
+              <Activity size={14} style={{ color: 'var(--text-soft)' }} />
             </div>
-            <div className="ps-stat-value" style={{ color: connState === 'connected' ? 'var(--green)' : 'var(--text-strong)' }}>
-              {connState === 'connected' ? '~12ms' : '—'}
+            <div className="ps-stat-value">
+              {session?.port ?? '—'}
             </div>
-            <div className="ps-stat-sub">Local forward latency</div>
+            <div className="ps-stat-sub">Traffic is forwarded here</div>
           </div>
           <div className="ps-stat">
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
@@ -298,7 +287,7 @@ export default function DashboardPage({
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               Zero-Install SSH Tunnel
             </span>
-            <span className="ps-badge ps-badge-purple">New</span>
+            <span className="ps-badge ps-badge-gray">SSH</span>
           </div>
           <div className="ps-code">
             ssh -R 80:localhost:{portInput || '3000'} portshare.kexoz.dev
@@ -311,11 +300,8 @@ export default function DashboardPage({
 
       {showNewTunnel && (
         <NewTunnelModal
-          onClose={() => setShowNewTunnel(false)}
-          onSubmit={(port) => {
-            setPortInput(String(port))
-            setShowNewTunnel(false)
-          }}
+          onClose={onCloseNewTunnel}
+          onSubmit={onCreateTunnel}
         />
       )}
     </div>

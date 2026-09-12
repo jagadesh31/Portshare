@@ -39,7 +39,7 @@ export default function Sidebar({ activePage, onNavigate, connState, publicUrl, 
         </div>
         <div>
           <div className="ps-brand-name">PortShare</div>
-          <div className="ps-brand-version">v1.0</div>
+          <div className="ps-brand-version">Desktop</div>
         </div>
       </div>
 

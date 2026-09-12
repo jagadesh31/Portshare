@@ -6,7 +6,6 @@ type Props = {
   publicDomain: string;
   sampleSubdomain: string;
   samplePort: string;
-  totalRequests: number;
 };
 
 function AnimatedCounter({ target, suffix = '' }: { target: number; suffix?: string }) {
@@ -38,8 +37,20 @@ function AnimatedCounter({ target, suffix = '' }: { target: number; suffix?: str
   return <span>{formatted}{suffix}</span>;
 }
 
-export default function HeroSection({ publicDomain, sampleSubdomain, samplePort, totalRequests }: Props) {
+export default function HeroSection({ publicDomain, sampleSubdomain, samplePort }: Props) {
   const sampleUrl = `https://${sampleSubdomain}.${publicDomain}`;
+  const [liveRequests, setLiveRequests] = useState(0);
+
+  useEffect(() => {
+    const apiBase = process.env.NEXT_PUBLIC_PORTSHARE_API_BASE;
+    if (!apiBase) return;
+    fetch(`${apiBase}/stats/global`)
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (data?.totalRequests) setLiveRequests(Number(data.totalRequests) || 0);
+      })
+      .catch(() => undefined);
+  }, []);
 
   return (
     <section className="hero-block">
@@ -84,8 +95,8 @@ export default function HeroSection({ publicDomain, sampleSubdomain, samplePort,
         <div className="hero-platforms">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
           <span>Windows</span>
-          <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)', letterSpacing: '-0.01em' }}>
+          <span style={{ color: 'var(--border-bright)' }}>·</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '0.75rem', color: 'var(--text-soft)', letterSpacing: '-0.01em' }}>
             ssh -R also supported
           </span>
         </div>
@@ -100,7 +111,7 @@ export default function HeroSection({ publicDomain, sampleSubdomain, samplePort,
       <div className="stats-bar">
         <div className="stat-item">
           <span className="stat-value live">
-            <AnimatedCounter target={totalRequests || 1284931} />
+            <AnimatedCounter target={liveRequests} />
           </span>
           <span className="stat-label">Requests Proxied</span>
         </div>
@@ -108,26 +119,22 @@ export default function HeroSection({ publicDomain, sampleSubdomain, samplePort,
         <div className="stat-divider" />
 
         <div className="stat-item">
-          <span className="stat-value">
-            <AnimatedCounter target={3247} />
-          </span>
-          <span className="stat-label">Active Tunnels</span>
+          <span className="stat-value">HTTPS</span>
+          <span className="stat-label">Public URLs</span>
         </div>
 
         <div className="stat-divider" />
 
         <div className="stat-item">
-          <span className="stat-value">
-            <AnimatedCounter target={892} />
-          </span>
-          <span className="stat-label">Developers</span>
+          <span className="stat-value">1 GB</span>
+          <span className="stat-label">Free monthly cap</span>
         </div>
 
         <div className="stat-divider" />
 
         <div className="stat-item">
-          <span className="stat-value">99.9%</span>
-          <span className="stat-label">Uptime</span>
+          <span className="stat-value">Open</span>
+          <span className="stat-label">Source client</span>
         </div>
 
         <div className="live-indicator" style={{ marginLeft: 'auto' }}>
