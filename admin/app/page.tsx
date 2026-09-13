@@ -62,7 +62,7 @@ export default function AdminPage() {
   }
 
   if (!me?.isAdmin) {
-    return <LoginScreen email={me?.email ?? ""} enabled={me?.enabled ?? false} />;
+    return <LoginScreen email={me?.email ?? ""} enabled={me?.enabled ?? false} error={error} />;
   }
 
   const conversion = data ? data.users.conversionRate : 0;

@@ -91,13 +91,27 @@ func main() {
 
 func configuredOrigins() []string {
 	value := os.Getenv("CORS_ORIGINS")
+	var origins []string
 	if value == "" {
-		return []string{"http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://127.0.0.1:3000"}
+		origins = []string{
+			"http://localhost:5173", "http://127.0.0.1:5173",
+			"http://localhost:3000", "http://127.0.0.1:3000",
+			"http://localhost:3001", "http://127.0.0.1:3001",
+		}
+	} else {
+		for _, origin := range strings.Split(value, ",") {
+			if trimmed := strings.TrimSpace(origin); trimmed != "" {
+				origins = append(origins, trimmed)
+			}
+		}
 	}
-	origins := make([]string, 0)
-	for _, origin := range strings.Split(value, ",") {
-		if trimmed := strings.TrimSpace(origin); trimmed != "" {
-			origins = append(origins, trimmed)
+	// Always allow the platform's own web origins. The admin panel lives on
+	// admin.<root> and authenticates with the shared Google session cookie, so
+	// its credentialed requests must never be blocked by a stale CORS_ORIGINS.
+	if root := strings.TrimSpace(os.Getenv("PORTSHARE_ROOT_DOMAIN")); root != "" &&
+		!strings.Contains(root, "localhost") && !strings.HasPrefix(root, "127.") {
+		for _, host := range []string{root, "admin." + root, "api." + root} {
+			origins = append(origins, "https://"+host)
 		}
 	}
 	return origins
