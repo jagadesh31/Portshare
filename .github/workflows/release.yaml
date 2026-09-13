@@ -71,35 +71,34 @@ jobs:
           - os: windows-latest
             arch: x64
             files: |
-              desktop/electron/out/make/squirrel.windows/**/*
+              desktop/electron/release-assets/PortShare-windows-x64-setup.exe
           - os: windows-latest
             arch: arm64
             # Squirrel's Setup.exe/RELEASES/nupkg names do not include the
-            # architecture, so uploading them from both Windows jobs makes
-            # them overwrite each other. Windows arm64 ships a portable zip;
-            # Windows x64 owns the Squirrel installer.
+            # architecture, so Windows arm64 ships a portable zip and the x64
+            # job owns the Squirrel installer.
             files: |
-              desktop/electron/out/make/zip/**/*
+              desktop/electron/release-assets/PortShare-windows-arm64.zip
           - os: macos-latest
             arch: x64
             files: |
-              desktop/electron/out/make/zip/**/*
+              desktop/electron/release-assets/PortShare-macos-x64.zip
           - os: macos-latest
             arch: arm64
             files: |
-              desktop/electron/out/make/zip/**/*
+              desktop/electron/release-assets/PortShare-macos-arm64.zip
           - os: ubuntu-latest
             arch: x64
             files: |
-              desktop/electron/out/make/deb/**/*
-              desktop/electron/out/make/rpm/**/*
-              desktop/electron/out/make/zip/**/*
+              desktop/electron/release-assets/portshare-linux-x64.deb
+              desktop/electron/release-assets/portshare-linux-x64.rpm
+              desktop/electron/release-assets/PortShare-linux-x64.zip
           - os: ubuntu-latest
             arch: arm64
             files: |
-              desktop/electron/out/make/deb/**/*
-              desktop/electron/out/make/rpm/**/*
-              desktop/electron/out/make/zip/**/*
+              desktop/electron/release-assets/portshare-linux-arm64.deb
+              desktop/electron/release-assets/portshare-linux-arm64.rpm
+              desktop/electron/release-assets/PortShare-linux-arm64.zip
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -126,6 +125,44 @@ jobs:
       - name: Build Installers (${{ matrix.arch }})
         working-directory: desktop/electron
         run: npm run make -- --arch=${{ matrix.arch }}
+
+      # Electron Forge embeds the version in zip/deb/rpm file names, which
+      # prevents the website from using releases/latest/download/<name>.
+      # Publish stable, versionless names instead.
+      - name: Normalize asset names
+        working-directory: desktop/electron
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          for f in out/make/zip/*/*/*.zip; do
+            [ -e "$f" ] || continue
+            case "$f" in
+              *win32-x64*)    cp "$f" release-assets/PortShare-windows-x64.zip ;;
+              *win32-arm64*)  cp "$f" release-assets/PortShare-windows-arm64.zip ;;
+              *darwin-x64*)   cp "$f" release-assets/PortShare-macos-x64.zip ;;
+              *darwin-arm64*) cp "$f" release-assets/PortShare-macos-arm64.zip ;;
+              *linux-x64*)    cp "$f" release-assets/PortShare-linux-x64.zip ;;
+              *linux-arm64*)  cp "$f" release-assets/PortShare-linux-arm64.zip ;;
+            esac
+          done
+          for f in out/make/deb/*/*.deb; do
+            [ -e "$f" ] || continue
+            case "$f" in
+              *_amd64.deb) cp "$f" release-assets/portshare-linux-x64.deb ;;
+              *_arm64.deb) cp "$f" release-assets/portshare-linux-arm64.deb ;;
+            esac
+          done
+          for f in out/make/rpm/*/*.rpm; do
+            [ -e "$f" ] || continue
+            case "$f" in
+              *x86_64.rpm) cp "$f" release-assets/portshare-linux-x64.rpm ;;
+              *arm64.rpm)  cp "$f" release-assets/portshare-linux-arm64.rpm ;;
+            esac
+          done
+          if [ -f out/make/squirrel.windows/x64/PortShare-Setup.exe ]; then
+            cp out/make/squirrel.windows/x64/PortShare-Setup.exe release-assets/PortShare-windows-x64-setup.exe
+          fi
+          ls -la release-assets
 
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v1

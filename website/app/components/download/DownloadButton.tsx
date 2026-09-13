@@ -7,37 +7,30 @@ type Platform = {
   id: string;
   label: string;
   detail: string;
-  available: boolean;
-  href?: string;
 };
 
 const platforms: Platform[] = [
-  {
-    id: 'windows-x64',
-    label: 'Windows',
-    detail: 'x64 installer',
-    available: true,
-    href: '/download/portshare-desktop?platform=windows-x64',
-  },
-  {
-    id: 'windows-arm',
-    label: 'Windows',
-    detail: 'ARM64',
-    available: false,
-  },
-  {
-    id: 'macos',
-    label: 'macOS',
-    detail: 'Apple Silicon & Intel',
-    available: false,
-  },
-  {
-    id: 'linux',
-    label: 'Linux',
-    detail: '.deb / AppImage',
-    available: false,
-  },
+  { id: 'windows-x64', label: 'Windows', detail: 'x64 · Installer (.exe)' },
+  { id: 'windows-arm64', label: 'Windows', detail: 'ARM64 · Portable (.zip)' },
+  { id: 'macos-arm64', label: 'macOS', detail: 'Apple Silicon · .zip' },
+  { id: 'macos-x64', label: 'macOS', detail: 'Intel · .zip' },
+  { id: 'linux-x64-deb', label: 'Linux', detail: 'x64 · .deb' },
+  { id: 'linux-x64-rpm', label: 'Linux', detail: 'x64 · .rpm' },
+  { id: 'linux-arm64-deb', label: 'Linux', detail: 'ARM64 · .deb' },
+  { id: 'linux-arm64-rpm', label: 'Linux', detail: 'ARM64 · .rpm' },
 ];
+
+/** Best-effort guess of the visitor's package. macOS arch is not detectable. */
+function detectPlatform(): string | null {
+  if (typeof navigator === 'undefined') return null;
+  const ua = navigator.userAgent;
+  const arm = /arm64|aarch64/i.test(ua);
+  if (/Windows/i.test(ua)) return arm ? 'windows-arm64' : 'windows-x64';
+  if (/Linux/i.test(ua) && !/Android/i.test(ua)) {
+    return arm ? 'linux-arm64-deb' : 'linux-x64-deb';
+  }
+  return null;
+}
 
 type Props = {
   className?: string;
@@ -47,7 +40,13 @@ type Props = {
 
 export default function DownloadButton({ className = 'btn btn-primary', style, children }: Props) {
   const [open, setOpen] = useState(false);
+  const [recommended, setRecommended] = useState<string | null>(null);
   const titleId = useId();
+
+  const openModal = () => {
+    setRecommended(detectPlatform());
+    setOpen(true);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -65,7 +64,7 @@ export default function DownloadButton({ className = 'btn btn-primary', style, c
 
   return (
     <>
-      <button type="button" className={className} style={style} onClick={() => setOpen(true)}>
+      <button type="button" className={className} style={style} onClick={openModal}>
         {children}
       </button>
 
@@ -94,7 +93,7 @@ export default function DownloadButton({ className = 'btn btn-primary', style, c
               <div className="download-modal-header">
                 <div>
                   <h2 id={titleId}>Download PortShare</h2>
-                  <p>Windows is available now. Other platforms are coming soon.</p>
+                  <p>Available for Windows, macOS and Linux on both x64 and ARM64.</p>
                 </div>
                 <button type="button" className="download-close" onClick={() => setOpen(false)} aria-label="Close">
                   ×
@@ -102,25 +101,24 @@ export default function DownloadButton({ className = 'btn btn-primary', style, c
               </div>
 
               <div className="download-list">
-                {platforms.map((platform) =>
-                  platform.available && platform.href ? (
-                    <a key={platform.id} className="download-row available" href={platform.href}>
-                      <span>
-                        <strong>{platform.label}</strong>
-                        <span className="download-detail">{platform.detail}</span>
-                      </span>
-                      <span className="download-action">Download</span>
-                    </a>
-                  ) : (
-                    <div key={platform.id} className="download-row soon">
-                      <span>
-                        <strong>{platform.label}</strong>
-                        <span className="download-detail">{platform.detail}</span>
-                      </span>
-                      <span className="download-badge">Coming soon</span>
-                    </div>
-                  ),
-                )}
+                {platforms.map((platform) => (
+                  <a
+                    key={platform.id}
+                    className="download-row available"
+                    href={`/download/portshare-desktop?platform=${platform.id}`}
+                  >
+                    <span>
+                      <strong>{platform.label}</strong>
+                      <span className="download-detail">{platform.detail}</span>
+                    </span>
+                    <span className="download-action">
+                      {recommended === platform.id && (
+                        <span className="download-badge">Your device</span>
+                      )}
+                      Download
+                    </span>
+                  </a>
+                ))}
               </div>
             </motion.div>
           </motion.div>
