@@ -5,6 +5,9 @@ module.exports = {
   packagerConfig: {
     asar: true,
     icon: './assets/logo.png',
+    // Keep the executable name lowercase so it matches the name the
+    // deb/rpm installers look for (they default to package.json "name").
+    executableName: 'portshare',
     extraResource: ['../frontend/dist'],
   },
   rebuildConfig: {},
@@ -22,11 +25,21 @@ module.exports = {
     },
     {
       name: '@electron-forge/maker-deb',
-      config: {},
+      config: {
+        options: {
+          name: 'portshare',
+          bin: 'portshare',
+        },
+      },
     },
     {
       name: '@electron-forge/maker-rpm',
-      config: {},
+      config: {
+        options: {
+          name: 'portshare',
+          bin: 'portshare',
+        },
+      },
     },
   ],
   plugins: [
