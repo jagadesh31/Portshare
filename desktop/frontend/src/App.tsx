@@ -11,7 +11,7 @@ import {
   type ClientSession, type ConnectionState, type FlowStep,
   API_BASE_URL, ROOT_DOMAIN,
   ensureClientIdentity, checkSubdomainAvailability, claimSubdomain,
-  updateExposedPort, updateCustomDomain, updateClientAuth
+  updateExposedPort, updateCustomDomain, updateClientAuth, fetchClientStats
 } from './lib/api'
 import { getClientId, setClientId } from './lib/storage'
 import { normalizeSubdomain, extractError } from './lib/utils'
@@ -72,6 +72,34 @@ export default function App() {
     const id = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(id)
   }, [connState])
+
+  useEffect(() => {
+    if (!session?.id || step !== 'dashboard') return
+    let cancelled = false
+
+    const refreshBandwidth = async () => {
+      try {
+        const stats = await fetchClientStats(session.id)
+        if (cancelled) return
+        setSession(cur => {
+          if (!cur) return cur
+          const used = stats.bandwidthUsed ?? cur.bandwidthUsed
+          const limit = stats.bandwidthLimit ?? cur.bandwidthLimit
+          if (used === cur.bandwidthUsed && limit === cur.bandwidthLimit) return cur
+          return { ...cur, bandwidthUsed: used, bandwidthLimit: limit }
+        })
+      } catch {
+        // Keep last known values if stats briefly fail.
+      }
+    }
+
+    void refreshBandwidth()
+    const id = window.setInterval(refreshBandwidth, 3000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [session?.id, step])
 
   const bootstrapClient = useCallback(async (): Promise<void> => {
     setStep('loading')

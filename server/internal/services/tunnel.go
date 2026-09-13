@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"net"
@@ -67,16 +68,44 @@ var tunnelStore = struct {
 
 // clientStats tracks per-client request counters.
 type clientStats struct {
-	TotalRequests int64            `json:"totalRequests"`
-	StatusCounts  map[string]int64 `json:"statusCounts"`
-	BytesIn       int64            `json:"bytesIn"`
-	BytesOut      int64            `json:"bytesOut"`
+	TotalRequests  int64            `json:"totalRequests"`
+	StatusCounts   map[string]int64 `json:"statusCounts"`
+	BytesIn        int64            `json:"bytesIn"`
+	BytesOut       int64            `json:"bytesOut"`
+	BandwidthUsed  int64            `json:"bandwidthUsed"`
+	BandwidthLimit int64            `json:"bandwidthLimit"`
 }
 
 var statsStore = struct {
 	sync.RWMutex
 	data map[string]*clientStats
 }{data: make(map[string]*clientStats)}
+
+func headerTransferBytes(headers map[string][]string) int64 {
+	var n int64
+	for name, values := range headers {
+		for _, value := range values {
+			// name + ": " + value + "\r\n"
+			n += int64(len(name) + len(value) + 4)
+		}
+	}
+	return n
+}
+
+func requestTransferBytes(c *gin.Context, body []byte) int64 {
+	// Approximate on-the-wire size: request line + headers + body.
+	n := int64(len(body))
+	n += int64(len(c.Request.Method) + 1 + len(c.Request.URL.RequestURI()) + len(" HTTP/1.1\r\n"))
+	n += headerTransferBytes(c.Request.Header)
+	return n
+}
+
+func responseTransferBytes(status int, headers map[string][]string, body []byte) int64 {
+	n := int64(len(body))
+	n += int64(len(fmt.Sprintf("HTTP/1.1 %d\r\n", status)))
+	n += headerTransferBytes(headers)
+	return n
+}
 
 // recordRequestStats updates the in-memory stats for a client.
 func recordRequestStats(clientID string, status int, bytesIn, bytesOut int64) {
@@ -104,17 +133,27 @@ func GetClientStats(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "clientId is required"})
 		return
 	}
+
+	out := clientStats{StatusCounts: make(map[string]int64)}
 	statsStore.RLock()
-	s, ok := statsStore.data[clientID]
-	statsStore.RUnlock()
-	if !ok {
-		// Return zeroed stats for clients with no traffic yet.
-		c.JSON(http.StatusOK, clientStats{StatusCounts: make(map[string]int64)})
-		return
+	if s, ok := statsStore.data[clientID]; ok {
+		out.TotalRequests = s.TotalRequests
+		out.BytesIn = s.BytesIn
+		out.BytesOut = s.BytesOut
+		for k, v := range s.StatusCounts {
+			out.StatusCounts[k] = v
+		}
 	}
-	statsStore.RLock()
-	defer statsStore.RUnlock()
-	c.JSON(http.StatusOK, s)
+	statsStore.RUnlock()
+
+	clientStore.RLock()
+	if client, ok := clientStore.clients[clientID]; ok {
+		out.BandwidthUsed = client.BandwidthUsed
+		out.BandwidthLimit = client.BandwidthLimit
+	}
+	clientStore.RUnlock()
+
+	c.JSON(http.StatusOK, out)
 }
 
 var tunnelUpgrader = websocket.Upgrader{
@@ -249,11 +288,201 @@ func getIPLimiter(ip string) *rate.Limiter {
 	return limiter
 }
 
+func portShareRootURL() string {
+	root := strings.TrimSpace(os.Getenv("PORTSHARE_ROOT_DOMAIN"))
+	if root == "" {
+		return "https://portshare.kexoz.dev"
+	}
+	return "https://" + root
+}
+
+func renderPortShareStatusPage(title, pill, heading, body, host, ctaLabel, ctaHref string) []byte {
+	hostBlock := ""
+	if host != "" {
+		hostBlock = `<div class="host">` + html.EscapeString(host) + `</div>`
+	}
+	return []byte(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>` + html.EscapeString(title) + `</title>
+  <style>
+    :root {
+      --bg: #07080a;
+      --card: #10141b;
+      --border: rgba(255,255,255,0.1);
+      --text: #e8eaef;
+      --muted: #9aa3b2;
+      --soft: #6b7380;
+      --green: #3dd68c;
+      --warn: #fbbf24;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(ellipse 70% 50% at 50% 0%, rgba(61,214,140,0.12), transparent 55%),
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px),
+        var(--bg);
+      background-size: auto, 48px 48px, 48px 48px, auto;
+    }
+    .shell {
+      width: min(460px, 100%);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 28px 24px;
+      box-shadow: 0 28px 70px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.03) inset;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 22px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      font-size: 15px;
+    }
+    .brand-mark {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: #0b0d12; border: 1px solid var(--border);
+      display: grid; place-items: center;
+    }
+    .brand-mark span {
+      width: 10px; height: 10px; border-radius: 50%;
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 3px rgba(61,214,140,0.35);
+    }
+    .pill {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 4px 10px; border-radius: 999px;
+      border: 1px solid rgba(251,191,36,0.28);
+      background: rgba(251,191,36,0.1);
+      color: var(--warn);
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .pill.offline {
+      border-color: rgba(154,163,178,0.35);
+      background: rgba(154,163,178,0.1);
+      color: var(--muted);
+    }
+    .pill i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 22px; line-height: 1.25;
+      letter-spacing: -0.03em;
+    }
+    p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 14px; line-height: 1.55;
+    }
+    .host {
+      margin: 16px 0 20px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      color: var(--green);
+      word-break: break-all;
+    }
+    .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 100%; border: none; border-radius: 10px;
+      padding: 12px 16px; font-size: 14px; font-weight: 650;
+      text-decoration: none; cursor: pointer;
+      background: #fff; color: #0b0d12;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+    .btn:hover { transform: translateY(-1px); opacity: 0.95; }
+    .btn-ghost {
+      background: transparent; color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+    .muted {
+      margin-top: 16px; text-align: center;
+      font-size: 12px; color: var(--soft);
+    }
+    .muted a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+    .code {
+      display: block;
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,0.28);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      color: #c5cad3;
+      line-height: 1.55;
+      text-align: left;
+    }
+    .code em { color: var(--green); font-style: normal; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><span></span></div>
+      PortShare
+    </div>
+    <div class="pill ` + pillClass(pill) + `"><i></i>` + html.EscapeString(pill) + `</div>
+    <h1>` + html.EscapeString(heading) + `</h1>
+    <p>` + body + `</p>
+    ` + hostBlock + `
+    <div class="actions">
+      <a class="btn" href="` + html.EscapeString(ctaHref) + `">` + html.EscapeString(ctaLabel) + `</a>
+      <a class="btn btn-ghost" href="` + portShareRootURL() + `/pricing">See pricing</a>
+    </div>
+    <div class="muted">
+      Built by Kexoz · <a href="` + portShareRootURL() + `">Get PortShare</a>
+    </div>
+  </div>
+</body>
+</html>`)
+}
+
+func pillClass(pill string) string {
+	if strings.EqualFold(pill, "offline") || strings.EqualFold(pill, "tunnel offline") {
+		return "offline"
+	}
+	return ""
+}
+
 func HandlePublicTunnel(c *gin.Context) {
 	clientID := clientForHost(c.Request.Host)
 	if clientID == "" {
 		if strings.Contains(c.GetHeader("Accept"), "text/html") {
-			c.Redirect(http.StatusFound, "https://"+os.Getenv("PORTSHARE_ROOT_DOMAIN"))
+			host := c.Request.Host
+			label := host
+			root := strings.ToLower(os.Getenv("PORTSHARE_ROOT_DOMAIN"))
+			if root != "" && strings.HasSuffix(strings.ToLower(host), "."+root) {
+				label = strings.TrimSuffix(strings.ToLower(host), "."+root)
+			}
+			c.Data(http.StatusNotFound, "text/html; charset=utf-8", renderPortShareStatusPage(
+				"Tunnel not found - PortShare",
+				"404 not found",
+				"This tunnel doesn't exist yet",
+				`Nobody has claimed <strong style="color:#e8eaef">`+html.EscapeString(label)+`</strong> on PortShare. Claim it in the desktop app and point it at any local port.`+
+					`<span class="code">Claim <em>`+html.EscapeString(label)+`</em><br>Expose localhost:3000<br>Share your public URL</span>`,
+				host,
+				"Claim a free subdomain",
+				portShareRootURL(),
+			))
 			return
 		}
 		c.JSON(http.StatusNotFound, gin.H{"message": "tunnel host is not configured"})
@@ -276,30 +505,15 @@ func HandlePublicTunnel(c *gin.Context) {
 
 	if connection == nil && sshConnection == nil {
 		if strings.Contains(c.GetHeader("Accept"), "text/html") {
-			c.Data(http.StatusBadGateway, "text/html; charset=utf-8", []byte(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tunnel Offline - PortShare</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #09090b; color: #f0f0f2; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: #13131a; border: 1px solid rgba(139, 92, 246, 0.15); padding: 40px; border-radius: 16px; text-align: center; max-width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
-        h1 { margin: 0 0 16px; font-size: 24px; color: #ffffff; }
-        p { color: #8a8a96; line-height: 1.5; margin-bottom: 24px; }
-        a { display: inline-block; background: #8b5cf6; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; transition: background 0.2s; }
-        a:hover { background: #7c3aed; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h1>Tunnel is Offline</h1>
-        <p>The developer's local environment is currently disconnected. Please try again later.</p>
-        <a href="https://`+os.Getenv("PORTSHARE_ROOT_DOMAIN")+`">Get your own PortShare tunnel</a>
-    </div>
-</body>
-</html>`))
+			c.Data(http.StatusBadGateway, "text/html; charset=utf-8", renderPortShareStatusPage(
+				"Tunnel Offline - PortShare",
+				"Tunnel offline",
+				"The tunnel is offline",
+				`This subdomain is claimed, but the developer's PortShare client isn't connected right now. Ask them to open the desktop app — or spin up your own tunnel in seconds.`,
+				c.Request.Host,
+				"Get PortShare",
+				portShareRootURL(),
+			))
 			return
 		}
 		c.JSON(http.StatusBadGateway, gin.H{"message": "desktop tunnel is offline"})
@@ -338,30 +552,151 @@ func HandlePublicTunnel(c *gin.Context) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Security Warning - PortShare</title>
+    <title>PortShare Tunnel Warning</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #09090b; color: #f0f0f2; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: #13131a; border: 1px solid rgba(239, 68, 68, 0.2); padding: 40px; border-radius: 16px; text-align: center; max-width: 450px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
-        h1 { margin: 0 0 16px; font-size: 22px; color: #ffffff; }
-        p { color: #8a8a96; line-height: 1.6; margin-bottom: 24px; font-size: 15px; }
-        .btn { display: inline-block; background: #ef4444; color: #ffffff; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background 0.2s; width: 100%; font-size: 15px; }
-        .btn:hover { background: #dc2626; }
-        .muted { margin-top: 20px; font-size: 12px; color: #6b6b78; }
-        .muted a { color: #8b5cf6; text-decoration: none; }
+      :root {
+        --bg: #07080a;
+        --card: #10141b;
+        --border: rgba(255,255,255,0.1);
+        --text: #e8eaef;
+        --muted: #9aa3b2;
+        --soft: #6b7380;
+        --green: #3dd68c;
+        --warn: #fbbf24;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(ellipse 70% 50% at 50% 0%, rgba(61,214,140,0.12), transparent 55%),
+          linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px),
+          var(--bg);
+        background-size: auto, 48px 48px, 48px 48px, auto;
+      }
+      .shell {
+        width: min(440px, 100%);
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 28px 28px 24px;
+        box-shadow: 0 28px 70px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.03) inset;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 22px;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        font-size: 15px;
+      }
+      .brand-mark {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: #0b0d12;
+        border: 1px solid var(--border);
+        display: grid;
+        place-items: center;
+      }
+      .brand-mark span {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 3px rgba(61,214,140,0.35);
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(251,191,36,0.28);
+        background: rgba(251,191,36,0.1);
+        color: var(--warn);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+      }
+      .pill i {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--warn);
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 22px;
+        line-height: 1.25;
+        letter-spacing: -0.03em;
+      }
+      p {
+        margin: 0 0 12px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.55;
+      }
+      p strong { color: var(--text); font-weight: 600; }
+      .host {
+        margin: 16px 0 20px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.03);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        color: var(--green);
+        word-break: break-all;
+      }
+      .btn {
+        width: 100%;
+        border: none;
+        border-radius: 10px;
+        padding: 12px 16px;
+        font-size: 14px;
+        font-weight: 650;
+        cursor: pointer;
+        background: #fff;
+        color: #0b0d12;
+        transition: transform 0.15s ease, opacity 0.15s ease;
+      }
+      .btn:hover { transform: translateY(-1px); opacity: 0.95; }
+      .muted {
+        margin-top: 16px;
+        text-align: center;
+        font-size: 12px;
+        color: var(--soft);
+      }
+      .muted a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 16px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-        <h1>You are about to visit a PortShare Tunnel</h1>
-        <p>This URL is served by a local developer's computer via PortShare. This content is user-generated and not vetted by PortShare.</p>
-        <p><b>Only proceed if you trust the person who sent you this link.</b></p>
+    <div class="shell">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"><span></span></div>
+          PortShare
+        </div>
+        <div class="pill"><i></i> Tunnel warning</div>
+        <h1>You're about to open a localhost tunnel</h1>
+        <p>This URL is forwarded to a developer's machine through PortShare. The page behind it is user-hosted and not reviewed by us.</p>
+        <p><strong>Continue only if you trust who shared this link.</strong></p>
+        <div class="host">`+html.EscapeString(c.Request.Host)+`</div>
         <form method="POST">
             <input type="hidden" name="action" value="continue">
-            <button type="submit" class="btn">I understand, continue to website</button>
+            <button type="submit" class="btn">I understand, continue</button>
         </form>
         <div class="muted">
-            Is this a malicious site? <a href="https://`+os.Getenv("PORTSHARE_ROOT_DOMAIN")+`">Report Abuse</a>
+            Suspicious link? <a href="https://`+os.Getenv("PORTSHARE_ROOT_DOMAIN")+`/abuse">Report abuse</a>
         </div>
     </div>
 </body>
@@ -417,10 +752,11 @@ func HandlePublicTunnel(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"message": "desktop tunnel connection failed"})
 		return
 	}
+	bytesIn := requestTransferBytes(c, body)
 	select {
 	case response := <-responseChannel:
 		if response.Error != "" {
-			recordRequestStats(clientID, http.StatusBadGateway, int64(len(body)), 0)
+			recordRequestStats(clientID, http.StatusBadGateway, bytesIn, 0)
 			c.JSON(http.StatusBadGateway, gin.H{"message": response.Error})
 			return
 		}
@@ -435,21 +771,21 @@ func HandlePublicTunnel(c *gin.Context) {
 		}
 		decoded, decodeErr := base64.StdEncoding.DecodeString(response.Body)
 		if decodeErr != nil {
-			recordRequestStats(clientID, http.StatusBadGateway, int64(len(body)), 0)
+			recordRequestStats(clientID, http.StatusBadGateway, bytesIn, 0)
 			c.JSON(http.StatusBadGateway, gin.H{"message": "invalid tunnel response"})
 			return
 		}
-		recordRequestStats(clientID, response.Status, int64(len(body)), int64(len(decoded)))
 		status := response.Status
 		if status < 100 {
 			status = http.StatusBadGateway
 		}
+		recordRequestStats(clientID, status, bytesIn, responseTransferBytes(status, response.Headers, decoded))
 		c.Status(status)
 		if _, writeErr := c.Writer.Write(decoded); writeErr != nil {
 			return
 		}
 	case <-time.After(60 * time.Second):
-		recordRequestStats(clientID, http.StatusGatewayTimeout, int64(len(body)), 0)
+		recordRequestStats(clientID, http.StatusGatewayTimeout, bytesIn, 0)
 		c.JSON(http.StatusGatewayTimeout, gin.H{"message": "desktop tunnel response timed out"})
 	}
 }

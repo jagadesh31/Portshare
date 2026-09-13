@@ -27,16 +27,9 @@ export default function CheckoutForm() {
         throw new Error(err.message || "Checkout failed");
       }
       
+      const data = await res.json();
       setMessage("Redirecting to secure checkout...");
-      
-      setTimeout(async () => {
-        await fetch(`${baseUrl}/client/billing/mock-webhook`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ clientId: clientId.trim() })
-        });
-        setMessage("Payment successful! Your account is now Pro. You can close this window.");
-      }, 1500);
+      window.location.href = data.url;
       
     } catch (err: any) {
       setMessage(err.message);

@@ -101,6 +101,21 @@ export const updateCustomDomain = async (clientId: string, domain: string): Prom
   return data.customDomain
 }
 
+export type ClientStatsResponse = {
+  totalRequests?: number
+  bytesIn?: number
+  bytesOut?: number
+  bandwidthUsed?: number
+  bandwidthLimit?: number
+}
+
+export const fetchClientStats = async (clientId: string): Promise<ClientStatsResponse> => {
+  const { data } = await axios.get<ClientStatsResponse>(`${API_BASE_URL}/client/stats`, {
+    params: { clientId },
+  })
+  return data
+}
+
 export const updateClientAuth = async (clientId: string, requireAuth: boolean): Promise<AuthResponse> => {
   const { data } = await axios.put<AuthResponse>(`${API_BASE_URL}/client/auth`, { clientId, requireAuth })
   return data

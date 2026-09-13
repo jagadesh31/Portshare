@@ -28,7 +28,8 @@ export default function HowItWorks({ sampleSubdomain, publicDomain }: { sampleSu
           y: 0,
           duration: 0.75,
           ease: 'power3.out',
-          scrollTrigger: { trigger: root, start: 'top 80%' },
+          immediateRender: false,
+          scrollTrigger: { trigger: root, start: 'top 80%', once: true },
         },
       );
 
@@ -41,7 +42,8 @@ export default function HowItWorks({ sampleSubdomain, publicDomain }: { sampleSu
           duration: 0.7,
           stagger: 0.12,
           ease: 'power3.out',
-          scrollTrigger: { trigger: root.querySelector('.steps-list'), start: 'top 85%' },
+          immediateRender: false,
+          scrollTrigger: { trigger: root.querySelector('.steps-list'), start: 'top 85%', once: true },
         },
       );
     }, root);

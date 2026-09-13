@@ -23,7 +23,7 @@ PortShare is a modern, open-source alternative to tools like ngrok. It allows yo
 - **🔎 Real-time Request Inspector:** Monitor incoming traffic, HTTP methods, headers, JSON bodies, and status codes live from the desktop dashboard.
 - **🌐 Permanent & Custom Domains:** Claim a persistent subdomain (`your-app.portshare.dev`) or bring your own domain (BYOD) via CNAME records.
 - **🔒 Google Auth Walls:** Protect sensitive local environments by requiring visitors to authenticate with a Google account before accessing the tunnel.
-- **💳 Stripe Billing Integration:** Built-in tier management and automated bandwidth upgrades via secure Stripe webhooks.
+- **💳 Razorpay Billing Integration:** Built-in tier management and automated bandwidth upgrades via secure Razorpay webhooks.
 
 ---
 
@@ -33,12 +33,12 @@ PortShare is built as a robust monorepo, separating concerns across four core co
 
 ### 1. The Core Server (`/server`)
 The brain of PortShare is a high-performance reverse proxy and tunneling server written in **Go**.
-- **Tech Stack:** Go, Gin-Gonic HTTP Router, Gorilla WebSockets, PostgreSQL, Stripe-Go.
+- **Tech Stack:** Go, Gin-Gonic HTTP Router, Gorilla WebSockets, PostgreSQL, Razorpay-Go.
 - **Functionality:** 
   - Manages secure persistent WebSocket connections with active clients.
   - Dynamically routes incoming HTTP requests on wildcard subdomains (`*.portshare.dev`) directly to the correct connected WebSocket client.
   - Handles byte-streaming, chunked transfer encoding, and HTTP hijacking.
-  - Manages the PostgreSQL database for user bandwidth limits, custom domain mapping, and Stripe webhook synchronization.
+  - Manages the PostgreSQL database for user bandwidth limits, custom domain mapping, and Razorpay webhook synchronization.
 
 ### 2. The Desktop App (`/desktop`)
 A cross-platform native application for developers who prefer visual management.
@@ -54,7 +54,7 @@ A blazing-fast, static/server-rendered frontend.
 - **Tech Stack:** Next.js 15 (App Router), React, TypeScript, Tailwind CSS.
 - **Functionality:**
   - Educates users and provides download links for the Windows binary.
-  - Handles Stripe Checkout for premium upgrades.
+  - Handles Razorpay Payment Links for premium upgrades.
   - Serves static legal pages (Terms, Privacy, Abuse Policy) and documentation.
 
 ### 4. The CLI (`/cli`)
@@ -81,7 +81,7 @@ go mod tidy
 # Run the server
 go run cmd/api/main.go
 ```
-*Note: The server requires environment variables for PostgreSQL (`DATABASE_URL`) and Stripe (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`).*
+*Note: The server requires environment variables for PostgreSQL (`DATABASE_URL`) and Stripe (`RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`).*
 
 ### Running the Next.js Website
 ```bash

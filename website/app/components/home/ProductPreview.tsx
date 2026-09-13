@@ -15,7 +15,7 @@ type Props = {
 const LOG = [
   { method: 'GET', path: '/api/users', status: 200, ms: 12 },
   { method: 'POST', path: '/api/auth/login', status: 201, ms: 48 },
-  { method: 'GET', path: '/webhook/stripe', status: 200, ms: 31 },
+  { method: 'GET', path: '/webhook/razorpay', status: 200, ms: 31 },
   { method: 'DELETE', path: '/api/posts/42', status: 404, ms: 6 },
   { method: 'GET', path: '/api/products', status: 200, ms: 9 },
 ];
@@ -50,7 +50,8 @@ export default function ProductPreview({ publicDomain, sampleSubdomain, samplePo
           duration: 0.8,
           stagger: 0.1,
           ease: 'power3.out',
-          scrollTrigger: { trigger: root, start: 'top 78%' },
+          immediateRender: false,
+          scrollTrigger: { trigger: root, start: 'top 78%', once: true },
         },
       );
     }, root);

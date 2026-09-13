@@ -23,6 +23,17 @@ const SKIP_HEADERS = new Set([
   'referer',
 ])
 
+/** Dev-server chatter that inflates request counts without real payload. */
+export function isNoiseRequestPath(path: string): boolean {
+  const pathname = path.split('?')[0]?.toLowerCase() ?? ''
+  return (
+    pathname.includes('/_next/webpack-hmr') ||
+    pathname.endsWith('/__webpack_hmr') ||
+    pathname.includes('/.well-known/') ||
+    pathname === '/favicon.ico'
+  )
+}
+
 function flattenHeaders(headers: Record<string, string[]> | undefined): Record<string, string> {
   const localHeaders: Record<string, string> = {}
   Object.entries(headers ?? {}).forEach(([key, value]) => {
@@ -89,10 +100,12 @@ export function createTunnelConnection({ apiBaseUrl, clientId, portRef, onStateC
 
       if (!port) {
         socket.send(JSON.stringify({ id: request.id, status: 503, headers: {}, error: 'No local port configured' }))
-        onLogEntry({
-          id: request.id, method: request.method, path: request.path, status: 503,
-          timestamp: new Date().toISOString(), durationMs: 0
-        })
+        if (!isNoiseRequestPath(request.path)) {
+          onLogEntry({
+            id: request.id, method: request.method, path: request.path, status: 503,
+            timestamp: new Date().toISOString(), durationMs: 0
+          })
+        }
         return
       }
 
@@ -106,6 +119,8 @@ export function createTunnelConnection({ apiBaseUrl, clientId, portRef, onStateC
             body: result.body,
           }))
         }
+
+        if (isNoiseRequestPath(request.path)) return
 
         let decodedBody = ''
         if (request.body) {
@@ -126,6 +141,7 @@ export function createTunnelConnection({ apiBaseUrl, clientId, portRef, onStateC
         if (socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify({ id: request.id, status: 502, headers: {}, error: message }))
         }
+        if (isNoiseRequestPath(request.path)) return
         onLogEntry({
           id: request.id, method: request.method, path: request.path, status: 502,
           timestamp: new Date().toISOString(), durationMs: Date.now() - startMs,

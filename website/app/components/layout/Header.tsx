@@ -10,23 +10,29 @@ export default function Header() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 12);
+    const onScroll = () => {
+      const y = window.scrollY || document.documentElement.scrollTop || 0;
+      setScrolled(y > 12);
+    };
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   useEffect(() => {
+    const apply = (value: 'light' | 'dark') => {
+      setTheme(value);
+      document.documentElement.dataset.theme = value;
+    };
+
     const saved = localStorage.getItem('portshare-web-theme');
     if (saved === 'light' || saved === 'dark') {
-      setTheme(saved);
-      document.documentElement.dataset.theme = saved;
+      apply(saved);
       return;
     }
+
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const initial = prefersDark ? 'dark' : 'light';
-    setTheme(initial);
-    document.documentElement.dataset.theme = initial;
+    apply(prefersDark ? 'dark' : 'light');
   }, []);
 
   const toggleTheme = () => {
@@ -34,6 +40,7 @@ export default function Header() {
     setTheme(next);
     localStorage.setItem('portshare-web-theme', next);
     document.documentElement.dataset.theme = next;
+    // Force paint + ScrollTrigger refresh after theme tokens swap.
     requestAnimationFrame(() => {
       window.dispatchEvent(new Event('resize'));
     });

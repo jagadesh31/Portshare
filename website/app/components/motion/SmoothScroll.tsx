@@ -23,14 +23,18 @@ export default function SmoothScroll({ children }: { children: React.ReactNode }
 
     gsap.ticker.add(tick);
     gsap.ticker.lagSmoothing(0);
-
     document.documentElement.classList.add('lenis');
 
+    // Lenis changes scroll metrics — refresh triggers so above-fold sections don't stay hidden.
+    requestAnimationFrame(() => ScrollTrigger.refresh());
+    const t = window.setTimeout(() => ScrollTrigger.refresh(), 250);
+
     return () => {
+      window.clearTimeout(t);
       gsap.ticker.remove(tick);
       lenis.destroy();
       document.documentElement.classList.remove('lenis');
-      ScrollTrigger.getAll().forEach((t) => t.kill());
+      ScrollTrigger.getAll().forEach((st) => st.kill());
     };
   }, []);
 

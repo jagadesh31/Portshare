@@ -31,7 +31,8 @@ export default function ComparisonTable() {
           y: 0,
           duration: 0.8,
           ease: 'power3.out',
-          scrollTrigger: { trigger: root, start: 'top 80%' },
+          immediateRender: false,
+          scrollTrigger: { trigger: root, start: 'top 80%', once: true },
         },
       );
 
@@ -44,7 +45,8 @@ export default function ComparisonTable() {
           duration: 0.55,
           stagger: 0.08,
           ease: 'power2.out',
-          scrollTrigger: { trigger: root.querySelector('.table-shell'), start: 'top 85%' },
+          immediateRender: false,
+          scrollTrigger: { trigger: root.querySelector('.table-shell'), start: 'top 85%', once: true },
         },
       );
     }, root);

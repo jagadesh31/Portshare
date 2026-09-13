@@ -7,7 +7,7 @@ const REQUESTS = [
   { method: 'POST',   path: '/api/auth/login',    status: 201, duration: '48ms' },
   { method: 'GET',    path: '/api/products',      status: 200, duration: '8ms'  },
   { method: 'DELETE', path: '/api/posts/42',      status: 404, duration: '6ms'  },
-  { method: 'GET',    path: '/webhook/stripe',    status: 200, duration: '31ms' },
+  { method: 'GET',    path: '/webhook/razorpay',  status: 200, duration: '31ms' },
 ];
 
 export default function TerminalMockup({ samplePort, sampleUrl }: { samplePort: string; sampleUrl: string }) {

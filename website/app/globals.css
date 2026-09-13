@@ -33,22 +33,22 @@
   --bg-elevated: #ffffff;
   --bg-surface: #ffffff;
   --bg-card: #ffffff;
-  --border: rgba(15, 18, 24, 0.08);
-  --border-bright: rgba(15, 18, 24, 0.16);
+  --border: rgba(15, 18, 24, 0.1);
+  --border-bright: rgba(15, 18, 24, 0.18);
   --text: #1a1f29;
   --text-strong: #0b0d12;
-  --text-muted: #5a6472;
-  --text-soft: #838c99;
+  --text-muted: #4a5563;
+  --text-soft: #6b7280;
   --text-inverse: #ffffff;
   --accent: #0b0d12;
   --accent-dim: rgba(11, 13, 18, 0.06);
   --green: #0f9f6e;
   --green-dim: rgba(15, 159, 110, 0.12);
   --cyan: #0e8aa8;
-  --header-bg: rgba(238, 240, 243, 0.82);
-  --glow: rgba(15, 159, 110, 0.14);
-  --mesh-a: rgba(15, 159, 110, 0.14);
-  --mesh-b: rgba(14, 138, 168, 0.1);
+  --header-bg: rgba(238, 240, 243, 0.88);
+  --glow: rgba(15, 159, 110, 0.16);
+  --mesh-a: rgba(15, 159, 110, 0.16);
+  --mesh-b: rgba(14, 138, 168, 0.12);
   --shadow: 0 28px 60px rgba(15, 18, 24, 0.12);
   --band: #0c0f14;
 }
@@ -401,6 +401,8 @@ a { color: inherit; text-decoration: none; }
   align-items: center;
   padding: clamp(32px, 5vw, 64px) 0 56px;
   min-height: min(72vh, 720px);
+  opacity: 1;
+  visibility: visible;
 }
 
 .hero-copy {
