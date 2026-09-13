@@ -3,11 +3,15 @@ package services
 import "testing"
 
 func TestReservedAPISubdomain(t *testing.T) {
-	if isReservedSubdomain("api") == false {
-		t.Fatal("api subdomain should be reserved")
+	for _, name := range []string{"api", "admin", "www", "app", "dashboard", "portshare"} {
+		if !isReservedSubdomain(name) {
+			t.Errorf("%s subdomain should be reserved", name)
+		}
 	}
-	if isReservedSubdomain("app") {
-		t.Fatal("app subdomain should not be reserved")
+	for _, name := range []string{"myapp", "dev-jagadesh", "cool-tunnel"} {
+		if isReservedSubdomain(name) {
+			t.Errorf("%s subdomain should not be reserved", name)
+		}
 	}
 }
 

@@ -45,7 +45,31 @@ var claimSubdomainCmd = &cobra.Command{
 	},
 }
 
+// reservedSubdomains mirrors the server blocklist (client.go) so users get an
+// instant, friendly error without a network round trip.
+var reservedSubdomains = map[string]struct{}{
+	"api": {}, "admin": {}, "administrator": {}, "www": {}, "app": {},
+	"dashboard": {}, "console": {}, "panel": {}, "docs": {}, "status": {},
+	"blog": {}, "mail": {}, "smtp": {}, "pop": {}, "imap": {}, "ftp": {},
+	"sftp": {}, "ssh": {}, "ns1": {}, "ns2": {}, "cdn": {}, "static": {},
+	"assets": {}, "auth": {}, "login": {}, "signin": {}, "signup": {},
+	"sso": {}, "oauth": {}, "billing": {}, "pay": {}, "payments": {},
+	"checkout": {}, "support": {}, "help": {}, "abuse": {}, "security": {},
+	"privacy": {}, "terms": {}, "webhook": {}, "webhooks": {}, "metrics": {},
+	"monitor": {}, "grafana": {}, "prometheus": {}, "db": {}, "database": {},
+	"redis": {}, "postgres": {}, "mysql": {}, "mongo": {}, "vpn": {},
+	"proxy": {}, "gateway": {}, "localhost": {}, "portshare": {}, "kexoz": {},
+}
+
+func isReservedSubdomain(name string) bool {
+	_, reserved := reservedSubdomains[name]
+	return reserved
+}
+
 func claimSubdomain(serverURL, clientID, subdomain string) error {
+	if isReservedSubdomain(subdomain) {
+		return fmt.Errorf("%q is reserved for PortShare infrastructure; choose another subdomain", subdomain)
+	}
 	payload := map[string]string{
 		"clientId":  clientID,
 		"subdomain": subdomain,

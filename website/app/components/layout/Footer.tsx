@@ -1,13 +1,14 @@
+import Link from 'next/link';
 import PortShareLogo from '../brand/PortShareLogo';
 
 export default function Footer() {
   return (
     <footer className="site-footer">
       <div className="footer-brand-row">
-        <a href="/" className="site-brand footer-brand-link">
+        <Link href="/" className="site-brand footer-brand-link">
           <PortShareLogo size={24} />
           PortShare
-        </a>
+        </Link>
         <span className="footer-copy-inline">
           © {new Date().getFullYear()} · Built by{' '}
           <a href="https://kexoz.dev" target="_blank" rel="noreferrer">Kexoz</a>

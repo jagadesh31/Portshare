@@ -42,6 +42,9 @@ jobs:
       - name: Typecheck + build
         working-directory: desktop/frontend
         run: npm run build
+        env:
+          VITE_PORTSHARE_API_BASE: "https://api.portshare.kexoz.dev"
+          VITE_PORTSHARE_ROOT_DOMAIN: "portshare.kexoz.dev"
 
   electron:
     runs-on: ubuntu-latest

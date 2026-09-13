@@ -23,7 +23,7 @@ export default function TermsPage() {
             <p>We reserve the right to instantly terminate your access to PortShare and permanently ban your IP address and client identity without warning if we detect any violation of the Acceptable Use policy.</p>
 
             <h2 style={{ color: 'var(--text)', fontSize: '1.4rem', margin: '16px 0 0' }}>3. Disclaimer of Warranties</h2>
-            <p>PortShare is provided "as is". While we strive for maximum uptime, we do not guarantee continuous availability. We are not responsible for any data loss, security breaches on your local machine, or damages resulting from the use of our service.</p>
+            <p>PortShare is provided &quot;as is&quot;. While we strive for maximum uptime, we do not guarantee continuous availability. We are not responsible for any data loss, security breaches on your local machine, or damages resulting from the use of our service.</p>
           </div>
         </div>
         <Footer />

@@ -34,6 +34,7 @@ export type AuthResponse = { requireAuth: boolean; gauthEnabled: boolean }
 export type AvailabilityResponse = {
   available?: boolean
   exists?: boolean
+  reserved?: boolean
 }
 
 export type PortResponse = { port?: number }
@@ -117,10 +118,12 @@ export const fetchLinkStatus = async (clientId: string): Promise<LinkStatus> => 
   return data
 }
 
-export const checkSubdomainAvailability = async (name: string): Promise<boolean> => {
+export const checkSubdomainAvailability = async (name: string): Promise<{ available: boolean; reserved: boolean }> => {
   const { data } = await axios.get<AvailabilityResponse>(`${API_BASE_URL}/subdomain/check`, { params: { name } })
-  if (typeof data.available === 'boolean') return data.available
-  if (typeof data.exists   === 'boolean') return !data.exists
+  if (typeof data.available === 'boolean') {
+    return { available: data.available, reserved: data.reserved === true }
+  }
+  if (typeof data.exists === 'boolean') return { available: !data.exists, reserved: false }
   throw new Error('Unexpected response while checking subdomain availability.')
 }
 

@@ -15,6 +15,7 @@ export default function TerminalMockup({ samplePort, sampleUrl }: { samplePort: 
   const [visibleCount, setVisibleCount] = useState(0);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
     const timers: ReturnType<typeof setTimeout>[] = [];
     REQUESTS.forEach((_, i) => {

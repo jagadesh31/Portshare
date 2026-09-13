@@ -2,6 +2,7 @@
 
 import { Sun, Moon } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import PortShareLogo from '../brand/PortShareLogo';
 import DownloadButton from '../download/DownloadButton';
 
@@ -49,16 +50,16 @@ export default function Header() {
   return (
     <div className={`header-rail ${scrolled ? 'scrolled' : ''}`}>
       <header className="site-header">
-        <a href="/" className="site-brand">
+        <Link href="/" className="site-brand">
           <PortShareLogo size={26} />
           <span>PortShare</span>
-        </a>
+        </Link>
 
         <nav className="header-nav" aria-label="Primary">
-          <a className="nav-link" href="/#how-it-works">How it works</a>
-          <a className="nav-link" href="/#product">Product</a>
-          <a className="nav-link" href="/#compare">Compare</a>
-          <a className="nav-link" href="/pricing">Pricing</a>
+          <Link className="nav-link" href="/#how-it-works">How it works</Link>
+          <Link className="nav-link" href="/#product">Product</Link>
+          <Link className="nav-link" href="/#compare">Compare</Link>
+          <Link className="nav-link" href="/pricing">Pricing</Link>
         </nav>
 
         <div className="header-actions">

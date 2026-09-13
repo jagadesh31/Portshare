@@ -63,7 +63,22 @@ var clientStore = struct {
 
 var subdomainPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])?$`)
 var customDomainLabelPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$`)
-var reservedSubdomains = map[string]struct{}{"api": {}}
+
+// reservedSubdomains are names PortShare infrastructure owns or may own
+// (api.portshare.*, admin.portshare.*, www, ...). Users cannot claim them.
+var reservedSubdomains = map[string]struct{}{
+	"api": {}, "admin": {}, "administrator": {}, "www": {}, "app": {},
+	"dashboard": {}, "console": {}, "panel": {}, "docs": {}, "status": {},
+	"blog": {}, "mail": {}, "smtp": {}, "pop": {}, "imap": {}, "ftp": {},
+	"sftp": {}, "ssh": {}, "ns1": {}, "ns2": {}, "cdn": {}, "static": {},
+	"assets": {}, "auth": {}, "login": {}, "signin": {}, "signup": {},
+	"sso": {}, "oauth": {}, "billing": {}, "pay": {}, "payments": {},
+	"checkout": {}, "support": {}, "help": {}, "abuse": {}, "security": {},
+	"privacy": {}, "terms": {}, "webhook": {}, "webhooks": {}, "metrics": {},
+	"monitor": {}, "grafana": {}, "prometheus": {}, "db": {}, "database": {},
+	"redis": {}, "postgres": {}, "mysql": {}, "mongo": {}, "vpn": {},
+	"proxy": {}, "gateway": {}, "localhost": {}, "portshare": {}, "kexoz": {},
+}
 
 var clientDatabase *sql.DB
 
@@ -433,8 +448,12 @@ func validCustomDomain(domain string) bool {
 
 func CheckSubdomain(c *gin.Context) {
 	name := strings.ToLower(strings.TrimSpace(c.Query("name")))
-	if !subdomainPattern.MatchString(name) || isReservedSubdomain(name) {
+	if !subdomainPattern.MatchString(name) {
 		c.JSON(http.StatusOK, gin.H{"available": false})
+		return
+	}
+	if isReservedSubdomain(name) {
+		c.JSON(http.StatusOK, gin.H{"available": false, "reserved": true})
 		return
 	}
 	clientStore.RLock()

@@ -31,8 +31,8 @@ export default function CheckoutForm() {
       setMessage("Redirecting to secure checkout...");
       window.location.href = data.url;
       
-    } catch (err: any) {
-      setMessage(err.message);
+    } catch (err: unknown) {
+      setMessage(err instanceof Error ? err.message : "Checkout failed");
     } finally {
       setIsBusy(false);
     }

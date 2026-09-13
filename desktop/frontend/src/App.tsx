@@ -258,8 +258,11 @@ export default function App() {
     }
     setIsBusy(true); setErrorMessage(''); setInfoMessage('Checking subdomain availability...')
     try {
-      if (!await checkSubdomainAvailability(name)) {
-        setErrorMessage('That subdomain is already taken. Try another one.')
+      const availability = await checkSubdomainAvailability(name)
+      if (!availability.available) {
+        setErrorMessage(availability.reserved
+          ? 'That subdomain is reserved for PortShare infrastructure. Try another one.'
+          : 'That subdomain is already taken. Try another one.')
         return
       }
       await claimSubdomain(session.id, name)
