@@ -32,8 +32,7 @@ export default function Header() {
       return;
     }
 
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    apply(prefersDark ? 'dark' : 'light');
+    apply('dark');
   }, []);
 
   const toggleTheme = () => {
