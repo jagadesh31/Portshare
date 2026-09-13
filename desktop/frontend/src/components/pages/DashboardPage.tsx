@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Copy, ExternalLink, Activity, Clock, Database, Plus, ChevronDown, ChevronUp, Check } from 'lucide-react'
 import type { ClientSession, ConnectionState } from '../../lib/api'
-import { ROOT_DOMAIN } from '../../lib/api'
+import { ROOT_DOMAIN, tierOf } from '../../lib/api'
 import NewTunnelModal from '../modals/NewTunnelModal'
 
 type Props = {
@@ -222,7 +222,7 @@ export default function DashboardPage({
             <div className="ps-tunnel-stat">
               <span className="ps-tunnel-stat-label">Plan</span>
               <span className="ps-tunnel-stat-value" style={{ textTransform: 'capitalize', fontSize: 14 }}>
-                {session?.plan ?? 'Free'}
+                {session ? ({ anonymous: 'Guest', verified: 'Verified', pro: 'Pro' } as const)[tierOf(session)] : '—'}
               </span>
             </div>
           </div>

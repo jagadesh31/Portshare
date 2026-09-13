@@ -11,7 +11,8 @@ import {
   type ClientSession, type ConnectionState, type FlowStep,
   API_BASE_URL, ROOT_DOMAIN,
   ensureClientIdentity, checkSubdomainAvailability, claimSubdomain,
-  updateExposedPort, updateCustomDomain, updateClientAuth, fetchClientStats
+  updateExposedPort, updateCustomDomain, updateClientAuth, fetchClientStats,
+  googleLinkLoginUrl, fetchLinkStatus, tierOf
 } from './lib/api'
 import { getClientId, setClientId } from './lib/storage'
 import { normalizeSubdomain, extractError } from './lib/utils'
@@ -23,7 +24,9 @@ import AppShell from './components/layout/AppShell'
 import Sidebar from './components/layout/Sidebar'
 import FeedbackBanner from './components/ui/FeedbackBanner'
 import LoadingScreen from './components/screens/LoadingScreen'
+import GateScreen from './components/screens/GateScreen'
 import SubdomainScreen from './components/screens/SubdomainScreen'
+import VerifyBanner from './components/dashboard/VerifyBanner'
 import DashboardPage from './components/pages/DashboardPage'
 import TunnelsPage from './components/pages/TunnelsPage'
 import RequestsPage from './components/pages/RequestsPage'
@@ -48,6 +51,7 @@ export default function App() {
   const [copyFeedback, setCopyFeedback] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [connState, setConnState] = useState<ConnectionState>('idle')
   const [gauthEnabled, setGauthEnabled] = useState(false)
+  const [verifying, setVerifying] = useState(false)
   const [connectedAt, setConnectedAt] = useState<number | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const [showNewTunnel, setShowNewTunnel] = useState(false)
@@ -57,6 +61,7 @@ export default function App() {
 
   const tunnelPort = useRef<number | null>(null)
   const tunnelClose = useRef<(() => void) | null>(null)
+  const verifyAttempt = useRef(0)
 
   const publicUrl = useMemo(() => {
     if (!session?.subdomain) return ''
@@ -135,15 +140,21 @@ export default function App() {
       })
       tunnelClose.current = tunnel.close
 
+      // Best-effort: needed by the verify gate and the auth-wall toggle.
+      try {
+        const { data: authStatus } = await axios.get<{ enabled: boolean }>(`${API_BASE_URL}/auth/google/status`)
+        setGauthEnabled(authStatus.enabled)
+      } catch {
+        setGauthEnabled(false)
+      }
+
       if (nextSession.subdomain.length > 0) {
         setStep('dashboard')
         setInfoMessage('Identity loaded. Set a local port to start forwarding.')
-        try {
-          const { data: authStatus } = await axios.get<{ enabled: boolean }>(`${API_BASE_URL}/auth/google/status`)
-          setGauthEnabled(authStatus.enabled)
-        } catch {
-          setGauthEnabled(false)
-        }
+      } else if (!nextSession.ownerEmail) {
+        // Brand-new identity: offer Google verification before subdomain setup.
+        setStep('gate')
+        setInfoMessage('Identity created. Verify with Google or continue as guest.')
       } else {
         setStep('subdomain')
         setInfoMessage('Identity created. Reserve your subdomain to continue.')
@@ -160,10 +171,67 @@ export default function App() {
   useEffect(() => {
     void bootstrapClient()
     return () => {
+      verifyAttempt.current += 1
       tunnelClose.current?.()
       tunnelClose.current = null
     }
   }, [bootstrapClient])
+
+  /** Opens Google sign-in in the browser, then polls until the link lands. */
+  const startGoogleVerify = useCallback(async (): Promise<void> => {
+    if (!session || verifying) return
+    if (!gauthEnabled) {
+      setErrorMessage('Google verification is not enabled on this server.')
+      return
+    }
+    const attempt = ++verifyAttempt.current
+    setVerifying(true)
+    setErrorMessage('')
+    setInfoMessage('Complete Google sign-in in your browser…')
+    window.open(googleLinkLoginUrl(session.id), '_blank', 'noopener')
+    const deadline = Date.now() + 5 * 60 * 1000
+    try {
+      for (;;) {
+        await new Promise(r => setTimeout(r, 2000))
+        if (verifyAttempt.current !== attempt) return
+        if (Date.now() > deadline) {
+          setErrorMessage('Verification timed out. Please try again.')
+          return
+        }
+        try {
+          const status = await fetchLinkStatus(session.id)
+          if (verifyAttempt.current !== attempt) return
+          if (status.linked) {
+            const fresh = await ensureClientIdentity(session.id)
+            if (verifyAttempt.current !== attempt) return
+            setClientId(fresh.id)
+            setSession(fresh)
+            setPortInput(fresh.port ? String(fresh.port) : '')
+            setSubdomainInput(fresh.subdomain)
+            setDomainInput(fresh.customDomain)
+            toast.success('Verified! 1 GB bandwidth unlocked')
+            setInfoMessage('Google linked — 1 GB bandwidth unlocked.')
+            setStep(cur => cur === 'gate' ? (fresh.subdomain ? 'dashboard' : 'subdomain') : cur)
+            return
+          }
+        } catch {
+          // Transient failure — keep polling until the deadline.
+        }
+      }
+    } finally {
+      if (verifyAttempt.current === attempt) setVerifying(false)
+    }
+  }, [session, verifying, gauthEnabled])
+
+  const skipGate = useCallback(() => {
+    verifyAttempt.current += 1
+    setVerifying(false)
+    setInfoMessage('Continuing as guest with 100 MB bandwidth. Verify anytime for 1 GB free.')
+    setStep(cur => {
+      if (cur !== 'gate') return cur
+      return session?.subdomain ? 'dashboard' : 'subdomain'
+    })
+  }, [session?.subdomain])
 
   const applyPort = async (port: number) => {
     if (!session) return
@@ -283,6 +351,17 @@ export default function App() {
           />
         )}
 
+        {step === 'gate' && session && (
+          <GateScreen
+            onLogin={() => void startGoogleVerify()}
+            onSkip={skipGate}
+            verifying={verifying}
+            gauthEnabled={gauthEnabled}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+          />
+        )}
+
         {step === 'subdomain' && session && (
           <SubdomainScreen
             session={session}
@@ -298,7 +377,13 @@ export default function App() {
         {step === 'dashboard' && session && (
           <>
             {activePage === 'dashboard' && (
-              <DashboardPage
+              <>
+                {tierOf(session) === 'anonymous' && gauthEnabled && (
+                  <div style={{ padding: '0 28px', paddingTop: 16 }}>
+                    <VerifyBanner onVerify={() => void startGoogleVerify()} verifying={verifying} />
+                  </div>
+                )}
+                <DashboardPage
                 session={session}
                 connState={connState}
                 portInput={portInput}
@@ -324,6 +409,7 @@ export default function App() {
                   await applyPort(port)
                 }}
               />
+              </>
             )}
 
             {activePage === 'tunnels' && (
@@ -365,6 +451,9 @@ export default function App() {
                 theme={theme}
                 onToggleTheme={toggleTheme}
                 session={session}
+                onVerify={() => void startGoogleVerify()}
+                verifying={verifying}
+                gauthEnabled={gauthEnabled}
               />
             )}
 

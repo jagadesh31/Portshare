@@ -64,7 +64,7 @@ function normalizeResponseHeaders(raw) {
   return headers;
 }
 
-function localRequest({ port, method, path: requestPath, headers, bodyBase64 }) {
+function localRequest({ port, method, path: requestPath, headers, body, bodyBase64 }) {
   return new Promise((resolve, reject) => {
     const req = http.request(
       {
@@ -82,14 +82,17 @@ function localRequest({ port, method, path: requestPath, headers, bodyBase64 }) 
           resolve({
             status: res.statusCode || 502,
             headers: normalizeResponseHeaders(res.headers),
-            body: Buffer.concat(chunks).toString('base64'),
+            // Raw bytes over IPC — no base64 round-trip.
+            body: Buffer.concat(chunks),
           });
         });
       },
     );
     req.on('timeout', () => req.destroy(new Error('Local service timed out')));
     req.on('error', reject);
-    if (bodyBase64) {
+    if (body && body.length) {
+      req.write(Buffer.from(body));
+    } else if (bodyBase64) {
       req.write(Buffer.from(bodyBase64, 'base64'));
     }
     req.end();

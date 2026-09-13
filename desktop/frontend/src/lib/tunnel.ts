@@ -1,5 +1,6 @@
-import { type TunnelRequest, type RequestLogEntry, type ConnectionState } from './api'
+import { type RequestLogEntry, type ConnectionState } from './api'
 import { toBase64, fromBase64 } from './utils'
+import { encodeFrame, decodeFrame, type WireRequest } from './wire'
 
 type CreateTunnelArgs = {
   apiBaseUrl: string
@@ -38,38 +39,63 @@ function flattenHeaders(headers: Record<string, string[]> | undefined): Record<s
   const localHeaders: Record<string, string> = {}
   Object.entries(headers ?? {}).forEach(([key, value]) => {
     if (SKIP_HEADERS.has(key.toLowerCase())) return
-    localHeaders[key] = value.join(', ')
+    localHeaders[key] = Array.isArray(value) ? value.join(', ') : String(value)
   })
   return localHeaders
 }
 
-async function proxyToLocal(port: number, request: TunnelRequest, localHeaders: Record<string, string>) {
-  const bodyBase64 = request.body || undefined
+/** Normalizes both wire formats (v2 binary frame / legacy JSON+base64). */
+function parseIncoming(data: ArrayBuffer | string): { binary: boolean; request: WireRequest } {
+  if (typeof data === 'string') {
+    const raw = JSON.parse(data) as {
+      id: string; method: string; path: string
+      headers?: Record<string, string[]>; body?: string
+    }
+    return {
+      binary: false,
+      request: {
+        id: raw.id, method: raw.method, path: raw.path,
+        headers: raw.headers ?? {},
+        body: raw.body ? fromBase64(raw.body) : new Uint8Array(0),
+      },
+    }
+  }
+  const { meta, body } = decodeFrame(data)
+  return {
+    binary: true,
+    request: {
+      id: meta.id ?? '', method: meta.method ?? 'GET', path: meta.path ?? '/',
+      headers: meta.headers ?? {}, body,
+    },
+  }
+}
 
+type ProxyResult = { status: number; headers: Record<string, string[]>; body: Uint8Array }
+
+async function proxyToLocal(port: number, request: WireRequest, localHeaders: Record<string, string>): Promise<ProxyResult> {
   if (window.portshare?.localRequest) {
-    return window.portshare.localRequest({
+    const result = await window.portshare.localRequest({
       port,
       method: request.method,
       path: request.path,
       headers: localHeaders,
-      bodyBase64,
+      body: request.body.byteLength ? request.body : undefined,
     })
+    const body = result.body instanceof Uint8Array ? result.body : new Uint8Array(result.body)
+    return { status: result.status, headers: result.headers, body }
   }
 
-  const requestBytes = fromBase64(request.body ?? '')
   const response = await fetch(`http://127.0.0.1:${port}${request.path}`, {
     method: request.method,
     headers: localHeaders,
-    body: request.method === 'GET' || request.method === 'HEAD' ? undefined : new Blob([requestBytes.buffer as ArrayBuffer]),
+    body: request.method === 'GET' || request.method === 'HEAD' || !request.body.byteLength
+      ? undefined
+      : new Blob([request.body.slice()]),
   })
   const responseBody = new Uint8Array(await response.arrayBuffer())
   const headers: Record<string, string[]> = {}
   response.headers.forEach((value, name) => { headers[name] = [value] })
-  return {
-    status: response.status,
-    headers,
-    body: toBase64(responseBody),
-  }
+  return { status: response.status, headers, body: responseBody }
 }
 
 export function createTunnelConnection({ apiBaseUrl, clientId, portRef, onStateChange, onLogEntry }: CreateTunnelArgs) {
@@ -77,13 +103,39 @@ export function createTunnelConnection({ apiBaseUrl, clientId, portRef, onStateC
   let tunnelSocket: WebSocket | null = null
   let reconnectTimer: number | null = null
   let reconnectDelay = 1000
+  let binaryMode = false
+  let modeKnown = false
 
   const protocol = apiBaseUrl.startsWith('https') ? 'wss' : 'ws'
-  const tunnelUrl = `${protocol}://${new URL(apiBaseUrl).host}/tunnel/connect?clientId=${encodeURIComponent(clientId)}`
+  // proto=2 asks for raw binary framing; older servers ignore it and reply
+  // with legacy JSON, which parseIncoming auto-detects.
+  const tunnelUrl = `${protocol}://${new URL(apiBaseUrl).host}/tunnel/connect?clientId=${encodeURIComponent(clientId)}&proto=2`
+
+  const sendPayload = (
+    socket: WebSocket,
+    payload: { id: string; status: number; headers: Record<string, string[]>; body?: Uint8Array; error?: string },
+  ): void => {
+    if (socket.readyState !== WebSocket.OPEN) return
+    if (binaryMode) {
+      socket.send(encodeFrame(
+        { id: payload.id, status: payload.status, headers: payload.headers, error: payload.error },
+        payload.body && payload.body.byteLength ? payload.body : undefined,
+      ))
+    } else {
+      socket.send(JSON.stringify({
+        id: payload.id,
+        status: payload.status,
+        headers: payload.headers,
+        error: payload.error,
+        body: payload.body && payload.body.byteLength ? toBase64(payload.body) : undefined,
+      }))
+    }
+  }
 
   const connectTunnel = (): void => {
     if (!shouldReconnect) return
     const socket = new WebSocket(tunnelUrl)
+    socket.binaryType = 'arraybuffer'
     tunnelSocket = socket
     onStateChange('connecting')
 
@@ -93,13 +145,23 @@ export function createTunnelConnection({ apiBaseUrl, clientId, portRef, onStateC
     }
 
     socket.onmessage = async (event) => {
-      const request = JSON.parse(event.data) as TunnelRequest
+      let parsed: { binary: boolean; request: WireRequest }
+      try {
+        parsed = parseIncoming(event.data as ArrayBuffer | string)
+      } catch {
+        return
+      }
+      if (!modeKnown) {
+        binaryMode = parsed.binary
+        modeKnown = true
+      }
+      const request = parsed.request
       const port = portRef.current
       const startMs = Date.now()
       const localHeaders = flattenHeaders(request.headers)
 
       if (!port) {
-        socket.send(JSON.stringify({ id: request.id, status: 503, headers: {}, error: 'No local port configured' }))
+        sendPayload(socket, { id: request.id, status: 503, headers: {}, error: 'No local port configured' })
         if (!isNoiseRequestPath(request.path)) {
           onLogEntry({
             id: request.id, method: request.method, path: request.path, status: 503,
@@ -111,21 +173,14 @@ export function createTunnelConnection({ apiBaseUrl, clientId, portRef, onStateC
 
       try {
         const result = await proxyToLocal(port, request, localHeaders)
-        if (socket.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({
-            id: request.id,
-            status: result.status,
-            headers: result.headers,
-            body: result.body,
-          }))
-        }
+        sendPayload(socket, { id: request.id, status: result.status, headers: result.headers, body: result.body })
 
         if (isNoiseRequestPath(request.path)) return
 
         let decodedBody = ''
-        if (request.body) {
+        if (request.body.byteLength) {
           try {
-            decodedBody = new TextDecoder().decode(fromBase64(request.body))
+            decodedBody = new TextDecoder().decode(request.body)
           } catch {
             decodedBody = '(binary or invalid text data)'
           }
@@ -138,9 +193,7 @@ export function createTunnelConnection({ apiBaseUrl, clientId, portRef, onStateC
         })
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Local service unavailable'
-        if (socket.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({ id: request.id, status: 502, headers: {}, error: message }))
-        }
+        sendPayload(socket, { id: request.id, status: 502, headers: {}, error: message })
         if (isNoiseRequestPath(request.path)) return
         onLogEntry({
           id: request.id, method: request.method, path: request.path, status: 502,
@@ -153,6 +206,7 @@ export function createTunnelConnection({ apiBaseUrl, clientId, portRef, onStateC
     socket.onclose = () => {
       if (tunnelSocket !== socket || !shouldReconnect) return
       tunnelSocket = null
+      modeKnown = false
       onStateChange('disconnected')
       if (shouldReconnect) {
         reconnectTimer = window.setTimeout(connectTunnel, reconnectDelay)

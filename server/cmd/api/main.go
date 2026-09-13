@@ -20,25 +20,23 @@ func main() {
 	if err := services.LoadClientStore(); err != nil {
 		panic(err)
 	}
+	// Gin debug mode costs per-request overhead; stay in release unless
+	// explicitly asked for debug output.
+	if strings.TrimSpace(os.Getenv("GIN_MODE")) == "" {
+		gin.SetMode(gin.ReleaseMode)
+	}
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 	config := cors.DefaultConfig()
 	allowed := configuredOrigins()
 	config.AllowOriginFunc = func(origin string) bool {
-		if origin == "" || origin == "null" {
-			return true
-		}
-		if strings.HasPrefix(origin, "file://") || strings.HasPrefix(origin, "portshare://") {
-			return true
-		}
-		for _, allowedOrigin := range allowed {
-			if allowedOrigin == "*" || allowedOrigin == origin {
-				return true
-			}
-		}
-		return false
+		return isAllowedOrigin(origin, allowed)
 	}
-	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept"}
+	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
+	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
+	// Admin panel (admin subdomain) authenticates with the Google session
+	// cookie, so credentialed cross-subdomain requests must be allowed.
+	config.AllowCredentials = true
 	corsMiddleware := cors.New(config)
 	r.Use(func(c *gin.Context) {
 		if strings.EqualFold(c.GetHeader("Upgrade"), "websocket") {
@@ -53,6 +51,7 @@ func main() {
 	routes.ClientRoutes(r)
 	routes.BillingRoutes(r)
 	routes.StatsRoutes(r)
+	routes.AdminRoutes(r)
 	r.GET("/tunnel/connect", services.ConnectTunnel)
 
 	r.GET("/health", func(ctx *gin.Context) {
@@ -102,4 +101,20 @@ func configuredOrigins() []string {
 		}
 	}
 	return origins
+}
+
+func isAllowedOrigin(origin string, allowed []string) bool {
+	if origin == "" || origin == "null" {
+		return false
+	}
+	// Packaged Electron app uses the custom protocol.
+	if strings.HasPrefix(origin, "portshare://") {
+		return true
+	}
+	for _, allowedOrigin := range allowed {
+		if allowedOrigin == origin {
+			return true
+		}
+	}
+	return false
 }

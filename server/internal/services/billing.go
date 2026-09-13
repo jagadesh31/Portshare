@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/razorpay/razorpay-go"
@@ -36,7 +38,9 @@ func GetBillingDetails(c *gin.Context) {
 
 func CreateCheckoutSession(c *gin.Context) {
 	var input struct {
-		ClientID string `json:"clientId"`
+		ClientID   string `json:"clientId"`
+		PlanID     string `json:"planId"`
+		CouponCode string `json:"couponCode"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil || input.ClientID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "clientId is required"})
@@ -64,15 +68,52 @@ func CreateCheckoutSession(c *gin.Context) {
 
 	domain := "https://" + os.Getenv("PORTSHARE_ROOT_DOMAIN")
 
+	// Resolve plan price (defaults to legacy Pro $12) and apply plan
+	// discount + coupon discount.
+	planID := strings.ToLower(strings.TrimSpace(input.PlanID))
+	if planID == "" {
+		planID = "pro"
+	}
+	amount := int64(1200)
+	currency := "USD"
+	description := "PortShare Pro Plan"
+	bandwidthLimit := proBandwidthLimit
+	if plans, err := listPlans(); err == nil {
+		for _, p := range plans {
+			if p.ID == planID && p.Active {
+				amount = planPriceAfterDiscount(p)
+				currency = p.Currency
+				description = "PortShare " + p.Name + " Plan"
+				bandwidthLimit = p.BandwidthLimit
+				break
+			}
+		}
+	}
+	couponCode := strings.ToUpper(strings.TrimSpace(input.CouponCode))
+	if couponCode != "" {
+		if cp, found := getCoupon(couponCode); found && couponUsable(cp) {
+			amount = applyCoupon(amount, cp)
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "invalid or expired coupon"})
+			return
+		}
+	}
+	if amount < 50 {
+		amount = 50 // payment-link minimum
+	}
+
 	data := map[string]interface{}{
-		"amount":       1200, // 12 USD in cents, or 12.00 INR in paisa depending on currency
-		"currency":     "USD",
-		"description":  "PortShare Pro Plan",
+		"amount":      amount,
+		"currency":    currency,
+		"description": description,
 		"customer": map[string]interface{}{
 			"name": "PortShare User",
 		},
 		"notes": map[string]interface{}{
-			"clientId": input.ClientID,
+			"clientId":       input.ClientID,
+			"planId":         planID,
+			"couponCode":     couponCode,
+			"bandwidthLimit": bandwidthLimit,
 		},
 		"callback_url":    domain + "/download/portshare-desktop?payment=success",
 		"callback_method": "get",
@@ -122,18 +163,32 @@ func RazorpayWebhook(c *gin.Context) {
 	}
 
 	if event.Event == "payment_link.paid" {
-		clientID := event.Payload.PaymentLink.Entity.Notes["clientId"]
+		notes := event.Payload.PaymentLink.Entity.Notes
+		clientID := notes["clientId"]
 		if clientID != "" {
+			planID := strings.ToLower(strings.TrimSpace(notes["planId"]))
+			if planID == "" {
+				planID = "pro"
+			}
+			bandwidthLimit := proBandwidthLimit // 100GB fallback
+			if raw := strings.TrimSpace(notes["bandwidthLimit"]); raw != "" {
+				if parsed, err := strconv.ParseInt(raw, 10, 64); err == nil && parsed > 0 {
+					bandwidthLimit = parsed
+				}
+			}
 			clientStore.Lock()
 			client, found := clientStore.clients[clientID]
 			if found {
-				client.Plan = "pro"
-				client.BandwidthLimit = 100 * 1024 * 1024 * 1024 // 100GB
+				client.Plan = planID
+				client.BandwidthLimit = bandwidthLimit
 			}
 			clientStore.Unlock()
 
 			if found && clientDatabase != nil {
-				_, _ = clientDatabase.Exec("UPDATE clients SET plan = 'pro', bandwidth_limit = $1 WHERE id = $2", client.BandwidthLimit, clientID)
+				_, _ = clientDatabase.Exec("UPDATE clients SET plan = $1, bandwidth_limit = $2 WHERE id = $3", planID, bandwidthLimit, clientID)
+				if couponCode := strings.ToUpper(strings.TrimSpace(notes["couponCode"])); couponCode != "" {
+					_, _ = clientDatabase.Exec("UPDATE coupons SET redeemed_count = redeemed_count + 1 WHERE code = $1", couponCode)
+				}
 			}
 		}
 	}

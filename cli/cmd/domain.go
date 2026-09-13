@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"portshare/config"
 
@@ -22,27 +23,15 @@ var claimSubdomainCmd = &cobra.Command{
 	Short: "Claim a subdomain",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		subdomain := args[0]
-		cfg, err := config.EnsureIdentity(ServerURL)
+		subdomain := strings.ToLower(strings.TrimSpace(args[0]))
+		serverURL := NormalizedServerURL()
+		cfg, err := config.EnsureIdentity(serverURL)
 		if err != nil {
 			return err
 		}
 
-		payload := map[string]string{
-			"clientId":  cfg.ClientID,
-			"subdomain": subdomain,
-		}
-		payloadBytes, _ := json.Marshal(payload)
-		
-		resp, err := http.Post(ServerURL+"/subdomain/claim", "application/json", bytes.NewReader(payloadBytes))
-		if err != nil {
-			return fmt.Errorf("request failed: %w", err)
-		}
-		defer resp.Body.Close()
-		
-		body, _ := io.ReadAll(resp.Body)
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("failed to claim subdomain: %s", string(body))
+		if err := claimSubdomain(serverURL, cfg.ClientID, subdomain); err != nil {
+			return err
 		}
 
 		cfg.Subdomain = subdomain
@@ -51,8 +40,29 @@ var claimSubdomainCmd = &cobra.Command{
 		}
 
 		fmt.Printf("Successfully claimed subdomain: %s\n", subdomain)
+		fmt.Printf("Public URL: https://%s.%s\n", subdomain, RootDomain)
 		return nil
 	},
+}
+
+func claimSubdomain(serverURL, clientID, subdomain string) error {
+	payload := map[string]string{
+		"clientId":  clientID,
+		"subdomain": subdomain,
+	}
+	payloadBytes, _ := json.Marshal(payload)
+
+	resp, err := config.HTTPClient.Post(serverURL+"/subdomain/claim", "application/json", bytes.NewReader(payloadBytes))
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<10))
+		return fmt.Errorf("failed to claim subdomain: %s", strings.TrimSpace(string(body)))
+	}
+	return nil
 }
 
 var setCustomDomainCmd = &cobra.Command{
@@ -60,8 +70,9 @@ var setCustomDomainCmd = &cobra.Command{
 	Short: "Set a custom domain",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		domain := args[0]
-		cfg, err := config.EnsureIdentity(ServerURL)
+		domain := strings.ToLower(strings.TrimSpace(args[0]))
+		serverURL := NormalizedServerURL()
+		cfg, err := config.EnsureIdentity(serverURL)
 		if err != nil {
 			return err
 		}
@@ -71,19 +82,19 @@ var setCustomDomainCmd = &cobra.Command{
 			"domain":   domain,
 		}
 		payloadBytes, _ := json.Marshal(payload)
-		
-		req, _ := http.NewRequest(http.MethodPut, ServerURL+"/client/domain", bytes.NewReader(payloadBytes))
+
+		req, _ := http.NewRequest(http.MethodPut, serverURL+"/client/domain", bytes.NewReader(payloadBytes))
 		req.Header.Set("Content-Type", "application/json")
-		
-		resp, err := http.DefaultClient.Do(req)
+
+		resp, err := config.HTTPClient.Do(req)
 		if err != nil {
 			return fmt.Errorf("request failed: %w", err)
 		}
 		defer resp.Body.Close()
-		
-		body, _ := io.ReadAll(resp.Body)
+
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<10))
 		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("failed to set custom domain: %s", string(body))
+			return fmt.Errorf("failed to set custom domain: %s", strings.TrimSpace(string(body)))
 		}
 
 		cfg.CustomDomain = domain

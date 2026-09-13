@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +18,46 @@ var sshStore = struct {
 	connections map[string]*gossh.ServerConn
 }{connections: make(map[string]*gossh.ServerConn)}
 
+// sshAnonAttempts rate-limits anonymous SSH identity creation per remote IP
+// to prevent DB bloat from unauthenticated clients requesting infinite IDs.
+var sshAnonAttempts = struct {
+	sync.Mutex
+	counts map[string][]time.Time
+}{counts: make(map[string][]time.Time)}
+
+func sshAnonAllowed(remoteAddr string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	now := time.Now()
+	cutoff := now.Add(-1 * time.Hour)
+	sshAnonAttempts.Lock()
+	defer sshAnonAttempts.Unlock()
+	attempts := sshAnonAttempts.counts[host]
+	fresh := attempts[:0]
+	for _, t := range attempts {
+		if t.After(cutoff) {
+			fresh = append(fresh, t)
+		}
+	}
+	if len(fresh) >= 10 {
+		sshAnonAttempts.counts[host] = fresh
+		return false
+	}
+	sshAnonAttempts.counts[host] = append(fresh, now)
+	return true
+}
+
+func isGenericSSHUsername(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "", "root", "ubuntu", "mac", "user", "admin", "test":
+		return true
+	default:
+		return false
+	}
+}
+
 func handleTCPIPForward(ctx ssh.Context, srv *ssh.Server, req *gossh.Request) (bool, []byte) {
 	conn := ctx.Value(ssh.ContextKeyConn).(*gossh.ServerConn)
 	clientID := ctx.User()
@@ -25,29 +66,41 @@ func handleTCPIPForward(ctx ssh.Context, srv *ssh.Server, req *gossh.Request) (b
 	client, ok := clientStore.clients[clientID]
 	clientStore.RUnlock()
 
-	// Create anonymous client if not authenticated or using generic usernames
-	if !ok || clientID == "" || clientID == "root" || clientID == "ubuntu" || clientID == "mac" || clientID == "user" {
+	// Create anonymous client if not authenticated or using generic usernames.
+	// Rate-limited per IP to prevent identity farming.
+	if !ok || isGenericSSHUsername(clientID) {
+		if !sshAnonAllowed(ctx.RemoteAddr().String()) {
+			return false, []byte("too many tunnel identities requested, try again later")
+		}
 		id := newClientID()
 		client = &clientRecord{
 			ID:             id,
 			Plan:           "free",
-			BandwidthLimit: 1073741824, // 1GB
+			BandwidthLimit: anonBandwidthLimit, // 100 MB guest tier
 		}
 		clientStore.Lock()
 		clientStore.clients[id] = client
-		persistLocked()
+		persistClientLocked(client)
 		clientStore.Unlock()
 		clientID = id
 	}
 
-	// Ensure subdomain is assigned
+	// Ensure subdomain is assigned (hold write lock for both struct + map).
+	clientStore.Lock()
 	if client.Subdomain == "" {
-		client.Subdomain = newClientID()[:8]
-		clientStore.Lock()
+		subdomain := newClientID()[:8]
+		// Avoid collision on the 8-char prefix.
+		for {
+			if _, taken := clientStore.subdomains[subdomain]; !taken {
+				break
+			}
+			subdomain = newClientID()[:8]
+		}
+		client.Subdomain = subdomain
 		clientStore.subdomains[client.Subdomain] = clientID
-		persistLocked()
-		clientStore.Unlock()
+		persistClientLocked(client)
 	}
+	clientStore.Unlock()
 
 	ctx.SetValue("clientID", clientID)
 
@@ -117,10 +170,10 @@ type sshConnWrapper struct {
 	conn *gossh.ServerConn
 }
 
-func (w *sshConnWrapper) LocalAddr() net.Addr               { return w.conn.LocalAddr() }
-func (w *sshConnWrapper) RemoteAddr() net.Addr              { return w.conn.RemoteAddr() }
-func (w *sshConnWrapper) SetDeadline(t time.Time) error     { return nil }
-func (w *sshConnWrapper) SetReadDeadline(t time.Time) error { return nil }
+func (w *sshConnWrapper) LocalAddr() net.Addr                { return w.conn.LocalAddr() }
+func (w *sshConnWrapper) RemoteAddr() net.Addr               { return w.conn.RemoteAddr() }
+func (w *sshConnWrapper) SetDeadline(t time.Time) error      { return nil }
+func (w *sshConnWrapper) SetReadDeadline(t time.Time) error  { return nil }
 func (w *sshConnWrapper) SetWriteDeadline(t time.Time) error { return nil }
 
 func openSSHChannel(conn *gossh.ServerConn) (net.Conn, error) {

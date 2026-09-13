@@ -9,6 +9,8 @@ import (
 func ClientRoutes(r *gin.Engine) {
 	client := r.Group("/client")
 	client.POST("/identity", services.EnsureClientIdentity)
+	client.GET("/link-status", services.LinkStatusHandler)
+	client.GET("/link-finish", services.LinkFinishHandler)
 	client.PUT("/port", services.UpdateClientPort)
 	client.PUT("/domain", services.UpdateClientDomain)
 	client.PUT("/auth", services.UpdateClientAuth)

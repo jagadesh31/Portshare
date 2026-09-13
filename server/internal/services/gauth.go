@@ -35,17 +35,17 @@ import (
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const (
-	gauthSessionCookie = "ps_gauth"   // signed session cookie name
-	gauthStateCookie   = "ps_state"   // signed CSRF state cookie name
+	gauthSessionCookie = "ps_gauth" // signed session cookie name
+	gauthStateCookie   = "ps_state" // signed CSRF state cookie name
 	gauthSessionTTL    = 12 * time.Hour
 	gauthStateTTL      = 10 * time.Minute
 )
 
 // gauthConfig returns a populated oauth2.Config or nil when not configured.
 func gauthConfig() *oauth2.Config {
-	clientID     := strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_ID"))
+	clientID := strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_ID"))
 	clientSecret := strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_SECRET"))
-	callbackURL  := strings.TrimSpace(os.Getenv("GOOGLE_OAUTH_CALLBACK_URL"))
+	callbackURL := strings.TrimSpace(os.Getenv("GOOGLE_OAUTH_CALLBACK_URL"))
 	if clientID == "" || clientSecret == "" || callbackURL == "" {
 		return nil
 	}
@@ -104,6 +104,20 @@ func verifyAndDecodeCookie(raw string, dst any) bool {
 		return false
 	}
 	return json.Unmarshal(data, dst) == nil
+}
+
+// gauthCookieDomain returns a parent domain (e.g. ".portshare.kexoz.dev") so
+// the Google session cookie is shared between the API host and the admin
+// panel subdomain. Empty for localhost/IP setups (host-only cookie).
+func gauthCookieDomain() string {
+	root := strings.TrimSpace(os.Getenv("PORTSHARE_ROOT_DOMAIN"))
+	if root == "" || strings.Contains(root, "localhost") || strings.HasPrefix(root, "127.") {
+		return ""
+	}
+	if !strings.HasPrefix(root, ".") {
+		root = "." + root
+	}
+	return root
 }
 
 // ── Session payload ───────────────────────────────────────────────────────────
@@ -297,6 +311,7 @@ func GoogleCallbackHandler(c *gin.Context) {
 		Name:     gauthSessionCookie,
 		Value:    sessionValue,
 		Path:     "/",
+		Domain:   gauthCookieDomain(),
 		MaxAge:   int(gauthSessionTTL.Seconds()),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
@@ -330,6 +345,7 @@ func GoogleLogoutHandler(c *gin.Context) {
 		Name:    gauthSessionCookie,
 		Value:   "",
 		Path:    "/",
+		Domain:  gauthCookieDomain(),
 		MaxAge:  -1,
 		Expires: time.Unix(0, 0),
 	})

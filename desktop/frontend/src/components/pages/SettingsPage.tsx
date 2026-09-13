@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Monitor, Shield, Wifi } from 'lucide-react'
-import type { ClientSession } from '../../lib/api'
+import { tierOf, type ClientSession } from '../../lib/api'
 import { API_BASE_URL, ROOT_DOMAIN } from '../../lib/api'
 
 type SettingsSection = 'appearance' | 'tunnel' | 'account'
@@ -15,10 +15,20 @@ type Props = {
   theme: 'light' | 'dark'
   onToggleTheme: () => void
   session: ClientSession
+  onVerify: () => void
+  verifying: boolean
+  gauthEnabled: boolean
 }
 
-export default function SettingsPage({ theme, onToggleTheme, session }: Props) {
+const TIER_LABEL: Record<string, string> = {
+  anonymous: 'Guest · 100 MB',
+  verified: 'Verified · 1 GB free',
+  pro: 'Pro · 100 GB',
+}
+
+export default function SettingsPage({ theme, onToggleTheme, session, onVerify, verifying, gauthEnabled }: Props) {
   const [active, setActive] = useState<SettingsSection>('appearance')
+  const tier = tierOf(session)
 
   return (
     <div className="ps-main">
@@ -108,9 +118,30 @@ export default function SettingsPage({ theme, onToggleTheme, session }: Props) {
                 <div className="ps-settings-row">
                   <div className="ps-settings-row-info">
                     <div className="ps-settings-row-label">Plan</div>
-                    <div className="ps-settings-row-desc">Current bandwidth plan for this identity</div>
+                    <div className="ps-settings-row-desc">Current bandwidth tier for this identity</div>
                   </div>
-                  <span className="ps-badge ps-badge-gray" style={{ textTransform: 'capitalize' }}>{session.plan}</span>
+                  <span className="ps-badge ps-badge-gray" style={{ textTransform: 'capitalize' }}>{TIER_LABEL[tier] ?? session.plan}</span>
+                </div>
+                <div className="ps-settings-row">
+                  <div className="ps-settings-row-info">
+                    <div className="ps-settings-row-label">Google verification</div>
+                    <div className="ps-settings-row-desc">
+                      {session.ownerEmail ? `Linked as ${session.ownerEmail}` : 'Unlock 1 GB free + auth wall'}
+                    </div>
+                  </div>
+                  {session.ownerEmail ? (
+                    <span className="ps-badge ps-badge-green">Verified</span>
+                  ) : !gauthEnabled ? (
+                    <span className="ps-badge ps-badge-gray">Unavailable</span>
+                  ) : (
+                    <button
+                      className="ps-btn ps-btn-primary ps-btn-sm"
+                      onClick={onVerify}
+                      disabled={verifying}
+                    >
+                      {verifying ? 'Check browser…' : 'Verify'}
+                    </button>
+                  )}
                 </div>
                 <div className="ps-settings-row">
                   <div className="ps-settings-row-info">

@@ -1,24 +1,20 @@
 import { useState, useCallback, useEffect } from 'react'
 import { setTheme as saveTheme } from '../lib/storage'
 
+function readInitialTheme(): 'light' | 'dark' {
+  // 1. Check localStorage first
+  const saved = localStorage.getItem('portshare-theme')
+  if (saved === 'light' || saved === 'dark') return saved
+  // 2. Fall back to OS preference
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
 export function useTheme() {
-  const [theme, setThemeState] = useState<'light' | 'dark'>('dark')
+  const [theme, setThemeState] = useState<'light' | 'dark'>(readInitialTheme)
 
   useEffect(() => {
-    // 1. Check localStorage first
-    const saved = localStorage.getItem('portshare-theme') as 'light' | 'dark' | null
-    if (saved === 'light' || saved === 'dark') {
-      setThemeState(saved)
-      document.documentElement.dataset.theme = saved
-      return
-    }
-
-    // 2. Fall back to OS preference
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    const initial = prefersDark ? 'dark' : 'light'
-    setThemeState(initial)
-    document.documentElement.dataset.theme = initial
-  }, [])
+    document.documentElement.dataset.theme = theme
+  }, [theme])
 
   // Listen for OS preference changes (only when no manual pref is saved)
   useEffect(() => {
@@ -26,9 +22,7 @@ export function useTheme() {
     const listener = (e: MediaQueryListEvent) => {
       const saved = localStorage.getItem('portshare-theme')
       if (!saved) {
-        const next = e.matches ? 'dark' : 'light'
-        setThemeState(next)
-        document.documentElement.dataset.theme = next
+        setThemeState(e.matches ? 'dark' : 'light')
       }
     }
     mq.addEventListener('change', listener)
@@ -39,7 +33,6 @@ export function useTheme() {
     setThemeState(prev => {
       const next = prev === 'dark' ? 'light' : 'dark'
       saveTheme(next)
-      document.documentElement.dataset.theme = next
       return next
     })
   }, [])

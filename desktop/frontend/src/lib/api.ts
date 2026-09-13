@@ -1,7 +1,9 @@
 import axios from 'axios'
 import { parsePort } from './utils'
 
-export type FlowStep = 'loading' | 'subdomain' | 'dashboard'
+export type FlowStep = 'loading' | 'gate' | 'subdomain' | 'dashboard'
+
+export type Tier = 'anonymous' | 'verified' | 'pro'
 
 export type ClientSession = {
   id: string
@@ -12,6 +14,7 @@ export type ClientSession = {
   plan: string
   bandwidthUsed: number
   bandwidthLimit: number
+  ownerEmail: string
 }
 
 export type IdentityResponse = {
@@ -23,6 +26,7 @@ export type IdentityResponse = {
   plan?: string
   bandwidthUsed?: number
   bandwidthLimit?: number
+  ownerEmail?: string | null
 }
 
 export type AuthResponse = { requireAuth: boolean; gauthEnabled: boolean }
@@ -76,8 +80,41 @@ export const ensureClientIdentity = async (existingId: string | null): Promise<C
     requireAuth: data.requireAuth ?? false,
     plan: data.plan ?? 'free',
     bandwidthUsed: data.bandwidthUsed ?? 0,
-    bandwidthLimit: data.bandwidthLimit ?? 1073741824,
+    bandwidthLimit: data.bandwidthLimit ?? 104857600,
+    ownerEmail: data.ownerEmail?.trim().toLowerCase() ?? '',
   }
+}
+
+export const tierOf = (session: Pick<ClientSession, 'plan' | 'ownerEmail'>): Tier => {
+  if (session.plan === 'pro') return 'pro'
+  if (session.ownerEmail) return 'verified'
+  return 'anonymous'
+}
+
+export type LinkStatus = {
+  linked: boolean
+  email: string
+  plan: string
+  tier: Tier
+  bandwidthUsed: number
+  bandwidthLimit: number
+}
+
+const toBase64Url = (value: string): string =>
+  btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+
+/** Browser URL that starts Google sign-in and lands on link-finish for clientId. */
+export const googleLinkLoginUrl = (clientId: string): string => {
+  const finish = `${API_BASE_URL}/client/link-finish?clientId=${encodeURIComponent(clientId)}`
+  return `${API_BASE_URL}/auth/google/login?next=${encodeURIComponent(toBase64Url(finish))}`
+}
+
+/** Polled while the user completes Google sign-in in their browser. */
+export const fetchLinkStatus = async (clientId: string): Promise<LinkStatus> => {
+  const { data } = await axios.get<LinkStatus>(`${API_BASE_URL}/client/link-status`, {
+    params: { clientId },
+  })
+  return data
 }
 
 export const checkSubdomainAvailability = async (name: string): Promise<boolean> => {

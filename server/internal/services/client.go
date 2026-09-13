@@ -1,16 +1,20 @@
 package services
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"html"
 	"net/http"
 	"net/url"
 	"os"
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -25,6 +29,29 @@ type clientRecord struct {
 	Plan           string `json:"plan"`
 	BandwidthUsed  int64  `json:"bandwidthUsed"`
 	BandwidthLimit int64  `json:"bandwidthLimit"`
+	OwnerEmail     string `json:"ownerEmail,omitempty"`
+}
+
+// Bandwidth tiers: guests start at 100 MB, linking a Google account unlocks
+// 1 GB free, and Pro raises it to 100 GB.
+const (
+	anonBandwidthLimit     int64 = 100 * 1024 * 1024
+	verifiedBandwidthLimit int64 = 1073741824
+	proBandwidthLimit      int64 = 100 * 1024 * 1024 * 1024
+)
+
+// TierOf reports the bandwidth tier: "pro", "verified", or "anonymous".
+func TierOf(client *clientRecord) string {
+	if client == nil {
+		return "anonymous"
+	}
+	if strings.EqualFold(client.Plan, "pro") {
+		return "pro"
+	}
+	if strings.TrimSpace(client.OwnerEmail) != "" {
+		return "verified"
+	}
+	return "anonymous"
 }
 
 var clientStore = struct {
@@ -35,6 +62,7 @@ var clientStore = struct {
 }{clients: make(map[string]*clientRecord), subdomains: make(map[string]string), domains: make(map[string]string)}
 
 var subdomainPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])?$`)
+var customDomainLabelPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$`)
 var reservedSubdomains = map[string]struct{}{"api": {}}
 
 var clientDatabase *sql.DB
@@ -48,11 +76,16 @@ func LoadClientStore() error {
 	if err != nil {
 		return err
 	}
-	if err := database.Ping(); err != nil {
+	database.SetMaxOpenConns(25)
+	database.SetMaxIdleConns(5)
+	database.SetConnMaxLifetime(5 * time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := database.PingContext(ctx); err != nil {
 		_ = database.Close()
 		return err
 	}
-	if _, err := database.Exec(`
+	if _, err := database.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS clients (
 			id TEXT PRIMARY KEY,
 			subdomain TEXT UNIQUE,
@@ -61,17 +94,23 @@ func LoadClientStore() error {
 			require_auth BOOLEAN NOT NULL DEFAULT FALSE,
 			plan TEXT NOT NULL DEFAULT 'free',
 			bandwidth_used BIGINT NOT NULL DEFAULT 0,
-			bandwidth_limit BIGINT NOT NULL DEFAULT 1073741824
+			bandwidth_limit BIGINT NOT NULL DEFAULT 1073741824,
+			owner_email TEXT NOT NULL DEFAULT ''
 		)`); err != nil {
 		_ = database.Close()
 		return err
 	}
 	// Migrate: add column if upgrading from an older schema.
-	_, _ = database.Exec(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS require_auth BOOLEAN NOT NULL DEFAULT FALSE`)
-	_, _ = database.Exec(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'free'`)
-	_, _ = database.Exec(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS bandwidth_used BIGINT NOT NULL DEFAULT 0`)
-	_, _ = database.Exec(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS bandwidth_limit BIGINT NOT NULL DEFAULT 1073741824`)
-	rows, err := database.Query("SELECT id, subdomain, custom_domain, port, require_auth, plan, bandwidth_used, bandwidth_limit FROM clients")
+	migrateCtx, migrateCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer migrateCancel()
+	_, _ = database.ExecContext(migrateCtx, `ALTER TABLE clients ADD COLUMN IF NOT EXISTS require_auth BOOLEAN NOT NULL DEFAULT FALSE`)
+	_, _ = database.ExecContext(migrateCtx, `ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'free'`)
+	_, _ = database.ExecContext(migrateCtx, `ALTER TABLE clients ADD COLUMN IF NOT EXISTS bandwidth_used BIGINT NOT NULL DEFAULT 0`)
+	_, _ = database.ExecContext(migrateCtx, `ALTER TABLE clients ADD COLUMN IF NOT EXISTS bandwidth_limit BIGINT NOT NULL DEFAULT 1073741824`)
+	_, _ = database.ExecContext(migrateCtx, `ALTER TABLE clients ADD COLUMN IF NOT EXISTS owner_email TEXT NOT NULL DEFAULT ''`)
+	queryCtx, queryCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer queryCancel()
+	rows, err := database.QueryContext(queryCtx, "SELECT id, subdomain, custom_domain, port, require_auth, plan, bandwidth_used, bandwidth_limit, owner_email FROM clients")
 	if err != nil {
 		_ = database.Close()
 		return err
@@ -85,7 +124,7 @@ func LoadClientStore() error {
 		var client clientRecord
 		var subdomain, customDomain sql.NullString
 		var port sql.NullInt64
-		if err := rows.Scan(&client.ID, &subdomain, &customDomain, &port, &client.RequireAuth, &client.Plan, &client.BandwidthUsed, &client.BandwidthLimit); err != nil {
+		if err := rows.Scan(&client.ID, &subdomain, &customDomain, &port, &client.RequireAuth, &client.Plan, &client.BandwidthUsed, &client.BandwidthLimit, &client.OwnerEmail); err != nil {
 			_ = database.Close()
 			return err
 		}
@@ -114,35 +153,48 @@ func LoadClientStore() error {
 	clientStore.domains = loadedDomains
 	clientStore.Unlock()
 	clientDatabase = database
+	ensureAdminTables(database)
 	return nil
 }
 
-func persistLocked() {
-	if clientDatabase == nil {
+func persistClientLocked(client *clientRecord) {
+	if clientDatabase == nil || client == nil {
 		return
 	}
-	tx, err := clientDatabase.Begin()
-	if err != nil {
+	var port any
+	if client.Port != nil {
+		port = *client.Port
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	// NOTE: bandwidth_used is intentionally NOT updated on conflict — the
+	// async flusher (bandwidth.go) owns that counter via deltas. Writing the
+	// in-memory absolute value here would double-count queued deltas.
+	_, _ = clientDatabase.ExecContext(ctx,
+		`INSERT INTO clients (id, subdomain, custom_domain, port, require_auth, plan, bandwidth_used, bandwidth_limit, owner_email)
+		 VALUES ($1, NULLIF($2, ''), NULLIF($3, ''), $4, $5, $6, $7, $8, $9)
+		 ON CONFLICT (id) DO UPDATE SET
+			subdomain = EXCLUDED.subdomain,
+			custom_domain = EXCLUDED.custom_domain,
+			port = EXCLUDED.port,
+			require_auth = EXCLUDED.require_auth,
+			plan = EXCLUDED.plan,
+			bandwidth_limit = EXCLUDED.bandwidth_limit,
+			owner_email = EXCLUDED.owner_email`,
+		client.ID, client.Subdomain, client.CustomDomain, port, client.RequireAuth, client.Plan, client.BandwidthUsed, client.BandwidthLimit, client.OwnerEmail,
+	)
+}
+
+func removeClientMappingsLocked(client *clientRecord) {
+	if client == nil {
 		return
 	}
-	if _, err := tx.Exec("TRUNCATE TABLE clients"); err != nil {
-		_ = tx.Rollback()
-		return
+	if client.Subdomain != "" {
+		delete(clientStore.subdomains, client.Subdomain)
 	}
-	for _, client := range clientStore.clients {
-		var port any
-		if client.Port != nil {
-			port = *client.Port
-		}
-		if _, err := tx.Exec(
-			"INSERT INTO clients (id, subdomain, custom_domain, port, require_auth, plan, bandwidth_used, bandwidth_limit) VALUES ($1, NULLIF($2, ''), NULLIF($3, ''), $4, $5, $6, $7, $8)",
-			client.ID, client.Subdomain, client.CustomDomain, port, client.RequireAuth, client.Plan, client.BandwidthUsed, client.BandwidthLimit,
-		); err != nil {
-			_ = tx.Rollback()
-			return
-		}
+	if client.CustomDomain != "" {
+		delete(clientStore.domains, client.CustomDomain)
 	}
-	_ = tx.Commit()
 }
 
 func EnsureClientIdentity(c *gin.Context) {
@@ -162,28 +214,118 @@ func EnsureClientIdentity(c *gin.Context) {
 	client := &clientRecord{
 		ID:             id,
 		Plan:           "free",
-		BandwidthLimit: 1073741824, // 1GB
+		BandwidthLimit: anonBandwidthLimit, // 100 MB guest tier; verify with Google for 1 GB
 	}
 	clientStore.clients[id] = client
-	persistLocked()
+	persistClientLocked(client)
 	c.JSON(http.StatusCreated, client)
 }
 
-// RecordBandwidth increments the bandwidth counter for a client in memory and DB.
-func RecordBandwidth(clientID string, bytes int64) {
-	if bytes == 0 {
-		return
+// LinkGoogleEmail binds a verified Google email to a client identity.
+// First-time verification upgrades guests below the verified tier to 1 GB.
+// Returns the client, whether bandwidth was upgraded, and whether found.
+func LinkGoogleEmail(clientID, email string) (*clientRecord, bool, bool) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if clientID == "" || email == "" {
+		return nil, false, false
 	}
 	clientStore.Lock()
-	client, ok := clientStore.clients[clientID]
-	if ok {
-		client.BandwidthUsed += bytes
+	defer clientStore.Unlock()
+	client, found := clientStore.clients[clientID]
+	if !found {
+		return nil, false, false
 	}
-	clientStore.Unlock()
+	client.OwnerEmail = email
+	upgraded := false
+	if !strings.EqualFold(client.Plan, "pro") && client.BandwidthLimit < verifiedBandwidthLimit {
+		client.BandwidthLimit = verifiedBandwidthLimit
+		upgraded = true
+	}
+	persistClientLocked(client)
+	return client, upgraded, true
+}
 
-	if clientDatabase != nil {
-		_, _ = clientDatabase.Exec("UPDATE clients SET bandwidth_used = bandwidth_used + $1 WHERE id = $2", bytes, clientID)
+// LinkStatusHandler is polled by the desktop/CLI app while the user completes
+// Google sign-in in their browser. clientId is unguessable, so it acts as
+// the capability for this endpoint.
+func LinkStatusHandler(c *gin.Context) {
+	clientID := strings.TrimSpace(c.Query("clientId"))
+	if clientID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "clientId is required"})
+		return
 	}
+	clientStore.RLock()
+	client, found := clientStore.clients[clientID]
+	clientStore.RUnlock()
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"message": "client identity not found"})
+		return
+	}
+	email := strings.TrimSpace(client.OwnerEmail)
+	c.JSON(http.StatusOK, gin.H{
+		"linked":         email != "",
+		"email":          email,
+		"plan":           client.Plan,
+		"tier":           TierOf(client),
+		"bandwidthUsed":  client.BandwidthUsed,
+		"bandwidthLimit": client.BandwidthLimit,
+	})
+}
+
+// LinkFinishHandler completes the browser side of "verify with Google".
+// Without a session it bounces through Google login and back here; with a
+// session it links the email and shows a success page.
+func LinkFinishHandler(c *gin.Context) {
+	clientID := strings.TrimSpace(c.Query("clientId"))
+	if clientID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "clientId is required"})
+		return
+	}
+	clientStore.RLock()
+	_, found := clientStore.clients[clientID]
+	clientStore.RUnlock()
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"message": "client identity not found"})
+		return
+	}
+	email := IsGAuthSession(c)
+	if email == "" {
+		scheme := "https"
+		if c.Request.TLS == nil && !strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https") {
+			scheme = "http"
+		}
+		back := scheme + "://" + c.Request.Host + c.Request.RequestURI
+		loginURL := "/auth/google/login?next=" + base64.RawURLEncoding.EncodeToString([]byte(back))
+		c.Redirect(http.StatusFound, loginURL)
+		c.Abort()
+		return
+	}
+	client, upgraded, ok := LinkGoogleEmail(clientID, email)
+	if !ok || client == nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "client identity not found"})
+		return
+	}
+	body := `Signed in as <strong style="color:#e8eaef">` + html.EscapeString(email) + `</strong>.`
+	if upgraded {
+		body += ` Your free bandwidth was upgraded to <strong style="color:#e8eaef">1&nbsp;GB</strong>.`
+	}
+	body += ` You can close this window and return to the PortShare app.`
+	c.Data(http.StatusOK, "text/html; charset=utf-8", renderPortShareStatusPage(
+		"Google linked - PortShare",
+		"Verified",
+		"Google account linked",
+		body,
+		"",
+		"Open PortShare",
+		portShareRootURL(),
+	))
+}
+
+// RecordBandwidth increments the in-memory counter synchronously (so limit
+// checks stay exact) and queues the delta for async DB persistence — it
+// never blocks the tunnel hot path on I/O. See bandwidth.go.
+func RecordBandwidth(clientID string, bytes int64) {
+	queueBandwidth(clientID, bytes)
 }
 
 func UpdateClientPort(c *gin.Context) {
@@ -203,7 +345,7 @@ func UpdateClientPort(c *gin.Context) {
 		return
 	}
 	client.Port = &input.Port
-	persistLocked()
+	persistClientLocked(client)
 	c.JSON(http.StatusOK, client)
 }
 
@@ -224,8 +366,12 @@ func UpdateClientAuth(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"message": "client identity not found"})
 		return
 	}
+	if input.RequireAuth && TierOf(client) == "anonymous" {
+		c.JSON(http.StatusForbidden, gin.H{"message": "verify with Google to enable the auth wall", "verifyRequired": true})
+		return
+	}
 	client.RequireAuth = input.RequireAuth
-	persistLocked()
+	persistClientLocked(client)
 	c.JSON(http.StatusOK, gin.H{"requireAuth": client.RequireAuth, "gauthEnabled": GAuthEnabled()})
 }
 
@@ -254,12 +400,18 @@ func UpdateClientDomain(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"message": "that domain is already mapped"})
 		return
 	}
+	// Custom domains are a Pro advantage: verified-free and guest tiers
+	// keep subdomains + higher bandwidth, domains require Pro.
+	if !strings.EqualFold(client.Plan, "pro") {
+		c.JSON(http.StatusPaymentRequired, gin.H{"message": "custom domains are a Pro feature — upgrade to map domains", "upgradeRequired": true})
+		return
+	}
 	if client.CustomDomain != "" {
 		delete(clientStore.domains, client.CustomDomain)
 	}
 	client.CustomDomain = domain
 	clientStore.domains[domain] = input.ClientID
-	persistLocked()
+	persistClientLocked(client)
 	c.JSON(http.StatusOK, gin.H{"customDomain": domain, "dnsTarget": "your PortShare public endpoint"})
 }
 
@@ -272,7 +424,7 @@ func validCustomDomain(domain string) bool {
 		return false
 	}
 	for _, label := range strings.Split(domain, ".") {
-		if len(label) < 1 || len(label) > 63 || !regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$`).MatchString(label) {
+		if len(label) < 1 || len(label) > 63 || !customDomainLabelPattern.MatchString(label) {
 			return false
 		}
 	}
@@ -311,8 +463,8 @@ func ClaimSubdomain(c *gin.Context) {
 	}
 	clientStore.Lock()
 	defer clientStore.Unlock()
-	client, clientFound := clientStore.clients[input.ClientID]
-	if !clientFound {
+	client, found := clientStore.clients[input.ClientID]
+	if !found {
 		c.JSON(http.StatusNotFound, gin.H{"message": "client identity not found"})
 		return
 	}
@@ -325,7 +477,7 @@ func ClaimSubdomain(c *gin.Context) {
 	}
 	client.Subdomain = name
 	clientStore.subdomains[name] = input.ClientID
-	persistLocked()
+	persistClientLocked(client)
 	c.JSON(http.StatusOK, client)
 }
 

@@ -8,10 +8,97 @@ on:
 permissions:
   contents: write
 
+env:
+  VITE_PORTSHARE_API_BASE: "https://api.portshare.kexoz.dev"
+  VITE_PORTSHARE_ROOT_DOMAIN: "portshare.kexoz.dev"
+
 jobs:
-  build-and-release:
-    runs-on: windows-latest
-    
+  # ── Go CLI binaries (windows/linux/macos × amd64/arm64) ────────────────
+  cli:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: cli
+    strategy:
+      matrix:
+        include:
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Build CLI
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          exe=""
+          if [ "${{ matrix.goos }}" = "windows" ]; then exe=".exe"; fi
+          go build -ldflags "-X portshare/cmd.Version=${{ github.ref_name }}" \
+            -o "dist/portshare-${{ matrix.goos }}-${{ matrix.goarch }}${exe}" .
+
+      - name: Upload CLI Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: cli/dist/portshare-*
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Electron desktop installers (windows/macos/linux × x64/arm64) ──────
+  desktop:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+            files: |
+              desktop/electron/out/make/squirrel.windows/**/*
+          - os: windows-latest
+            arch: arm64
+            files: |
+              desktop/electron/out/make/squirrel.windows/**/*
+              desktop/electron/out/make/zip/**/*
+          - os: macos-latest
+            arch: x64
+            files: |
+              desktop/electron/out/make/zip/**/*
+          - os: macos-latest
+            arch: arm64
+            files: |
+              desktop/electron/out/make/zip/**/*
+          - os: ubuntu-latest
+            arch: x64
+            files: |
+              desktop/electron/out/make/deb/**/*
+              desktop/electron/out/make/rpm/**/*
+              desktop/electron/out/make/zip/**/*
+          - os: ubuntu-latest
+            arch: arm64
+            files: |
+              desktop/electron/out/make/deb/**/*
+              desktop/electron/out/make/rpm/**/*
+              desktop/electron/out/make/zip/**/*
+    runs-on: ${{ matrix.os }}
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -20,32 +107,27 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          
+
+      - name: Install Linux packaging tools
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y fakeroot rpm
+
       - name: Install Frontend Dependencies
         working-directory: desktop/frontend
         run: npm ci
-
-      - name: Build Frontend
-        working-directory: desktop/frontend
-        run: npm run build
-        env:
-          VITE_PORTSHARE_API_BASE: "https://api.portshare.kexoz.dev"
-          VITE_PORTSHARE_ROOT_DOMAIN: "portshare.kexoz.dev"
 
       - name: Install Electron Dependencies
         working-directory: desktop/electron
         run: npm ci
 
-      - name: Build Installer
+      - name: Build Installers (${{ matrix.arch }})
         working-directory: desktop/electron
-        run: npm run make
-        env:
-          VITE_PORTSHARE_API_BASE: "https://api.portshare.kexoz.dev"
-          VITE_PORTSHARE_ROOT_DOMAIN: "portshare.kexoz.dev"
+        run: npm run make -- --arch=${{ matrix.arch }}
 
-      - name: Upload Release Asset
+      - name: Upload Release Assets
         uses: softprops/action-gh-release@v1
         with:
-          files: desktop/electron/out/make/squirrel.windows/x64/PortShare-Setup.exe
+          files: ${{ matrix.files }}
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

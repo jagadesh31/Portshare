@@ -3,8 +3,8 @@ package services
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
@@ -27,15 +27,60 @@ const maxTunnelBody = 10 << 20
 const tunnelPongWait = 60 * time.Second
 const tunnelPingPeriod = (tunnelPongWait * 9) / 10
 
+// Read limit for inbound tunnel frames: max body + metadata headroom.
+const tunnelReadLimit = maxTunnelBody + (2 << 20)
+
 type tunnelConnection struct {
-	conn *websocket.Conn
-	mu   sync.Mutex
+	conn   *websocket.Conn
+	binary bool
+	mu     sync.Mutex
 }
 
-func (connection *tunnelConnection) writeJSON(value any) error {
+// writeRequest sends a request to the tunnel client, using raw binary framing
+// when the client negotiated proto=2, or legacy JSON (base64 body) otherwise.
+func (connection *tunnelConnection) writeRequest(req *tunnelRequest) error {
 	connection.mu.Lock()
 	defer connection.mu.Unlock()
-	return connection.conn.WriteJSON(value)
+	if !connection.binary {
+		return connection.conn.WriteJSON(req)
+	}
+	meta, err := json.Marshal(tunnelMeta{
+		ID: req.ID, Method: req.Method, Path: req.Path, Headers: req.Headers,
+	})
+	if err != nil {
+		return err
+	}
+	return connection.conn.WriteMessage(websocket.BinaryMessage, encodeTunnelFrame(meta, req.Body))
+}
+
+// readResponse blocks for the next response, decoding either framing.
+func (connection *tunnelConnection) readResponse() (tunnelResponse, error) {
+	if !connection.binary {
+		var resp tunnelResponse
+		err := connection.conn.ReadJSON(&resp)
+		return resp, err
+	}
+	messageType, data, err := connection.conn.ReadMessage()
+	if err != nil {
+		return tunnelResponse{}, err
+	}
+	if messageType != websocket.BinaryMessage {
+		// Peer fell back to legacy JSON mid-stream; tolerate it.
+		var resp tunnelResponse
+		if err := json.Unmarshal(data, &resp); err != nil {
+			return tunnelResponse{}, err
+		}
+		return resp, nil
+	}
+	meta, body, err := decodeTunnelFrame(data)
+	if err != nil {
+		return tunnelResponse{}, err
+	}
+	var m tunnelMeta
+	if err := json.Unmarshal(meta, &m); err != nil {
+		return tunnelResponse{}, err
+	}
+	return tunnelResponse{ID: m.ID, Status: m.Status, Headers: m.Headers, Error: m.Error, Body: body}, nil
 }
 
 func (connection *tunnelConnection) ping() error {
@@ -49,14 +94,14 @@ type tunnelRequest struct {
 	Method  string              `json:"method"`
 	Path    string              `json:"path"`
 	Headers map[string][]string `json:"headers"`
-	Body    string              `json:"body,omitempty"`
+	Body    []byte              `json:"body,omitempty"`
 }
 
 type tunnelResponse struct {
 	ID      string              `json:"id"`
 	Status  int                 `json:"status"`
 	Headers map[string][]string `json:"headers"`
-	Body    string              `json:"body,omitempty"`
+	Body    []byte              `json:"body,omitempty"`
 	Error   string              `json:"error,omitempty"`
 }
 
@@ -160,8 +205,38 @@ var tunnelUpgrader = websocket.Upgrader{
 	ReadBufferSize:  16 << 10,
 	WriteBufferSize: 16 << 10,
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+		origin := r.Header.Get("Origin")
+		// Non-browser clients (Go CLI, curl) send no Origin.
+		if origin == "" {
+			return true
+		}
+		if origin == "null" {
+			return false
+		}
+		if strings.HasPrefix(origin, "portshare://") {
+			return true
+		}
+		for _, allowedOrigin := range configuredCORSOrigins() {
+			if allowedOrigin == origin {
+				return true
+			}
+		}
+		return false
 	},
+}
+
+func configuredCORSOrigins() []string {
+	value := strings.TrimSpace(os.Getenv("CORS_ORIGINS"))
+	if value == "" {
+		return []string{"http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://127.0.0.1:3000"}
+	}
+	origins := make([]string, 0)
+	for _, origin := range strings.Split(value, ",") {
+		if trimmed := strings.TrimSpace(origin); trimmed != "" {
+			origins = append(origins, trimmed)
+		}
+	}
+	return origins
 }
 
 func ConnectTunnel(c *gin.Context) {
@@ -181,8 +256,12 @@ func ConnectTunnel(c *gin.Context) {
 	if err != nil {
 		return
 	}
-	connection := &tunnelConnection{conn: conn}
+	// proto=2 clients speak the raw binary framing (no base64); legacy
+	// clients omit it and keep the JSON protocol.
+	binaryProtocol := strings.TrimSpace(c.Query("proto")) == "2"
+	connection := &tunnelConnection{conn: conn, binary: binaryProtocol}
 	_ = conn.SetReadDeadline(time.Now().Add(tunnelPongWait))
+	conn.SetReadLimit(tunnelReadLimit)
 	conn.SetPongHandler(func(string) error {
 		return conn.SetReadDeadline(time.Now().Add(tunnelPongWait))
 	})
@@ -213,8 +292,8 @@ func ConnectTunnel(c *gin.Context) {
 	}()
 
 	for {
-		var response tunnelResponse
-		if err := conn.ReadJSON(&response); err != nil {
+		response, err := connection.readResponse()
+		if err != nil {
 			// Ignore expected disconnects (client closed app, network drop, TCP reset).
 			if !isExpectedWSClose(err) {
 				log.Printf("[tunnel] unexpected read error for client %s: %v", clientID, err)
@@ -265,26 +344,55 @@ func isExpectedWSClose(err error) bool {
 	return false
 }
 
+type ipLimiterEntry struct {
+	limiter  *rate.Limiter
+	lastSeen time.Time
+}
+
 var ipRateLimiters = struct {
 	sync.RWMutex
-	limiters map[string]*rate.Limiter
-}{limiters: make(map[string]*rate.Limiter)}
+	limiters map[string]*ipLimiterEntry
+}{limiters: make(map[string]*ipLimiterEntry)}
+
+func init() {
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			cutoff := time.Now().Add(-30 * time.Minute)
+			ipRateLimiters.Lock()
+			for ip, entry := range ipRateLimiters.limiters {
+				if entry.lastSeen.Before(cutoff) {
+					delete(ipRateLimiters.limiters, ip)
+				}
+			}
+			ipRateLimiters.Unlock()
+		}
+	}()
+}
 
 func getIPLimiter(ip string) *rate.Limiter {
 	ipRateLimiters.RLock()
-	limiter, exists := ipRateLimiters.limiters[ip]
+	entry, exists := ipRateLimiters.limiters[ip]
 	ipRateLimiters.RUnlock()
 
-	if !exists {
+	if exists {
 		ipRateLimiters.Lock()
-		defer ipRateLimiters.Unlock()
-		limiter, exists = ipRateLimiters.limiters[ip]
-		if !exists {
-			// 30 requests per second, burst of 60
-			limiter = rate.NewLimiter(30, 60)
-			ipRateLimiters.limiters[ip] = limiter
-		}
+		entry.lastSeen = time.Now()
+		ipRateLimiters.Unlock()
+		return entry.limiter
 	}
+	ipRateLimiters.Lock()
+	defer ipRateLimiters.Unlock()
+	if entry, exists = ipRateLimiters.limiters[ip]; exists {
+		entry.lastSeen = time.Now()
+		return entry.limiter
+	}
+	// 30 requests per second, burst of 60.
+	// NOTE: in-memory only. For multi-instance deployments, replace with a
+	// shared store (e.g. Redis fixed-window counter keyed by IP).
+	limiter := rate.NewLimiter(30, 60)
+	ipRateLimiters.limiters[ip] = &ipLimiterEntry{limiter: limiter, lastSeen: time.Now()}
 	return limiter
 }
 
@@ -488,6 +596,8 @@ func HandlePublicTunnel(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"message": "tunnel host is not configured"})
 		return
 	}
+	// Count the view (human vs bot) for the admin dashboard.
+	RecordViewer(c.GetHeader("User-Agent"))
 	tunnelStore.RLock()
 	connection := tunnelStore.connections[clientID]
 	tunnelStore.RUnlock()
@@ -536,7 +646,6 @@ func HandlePublicTunnel(c *gin.Context) {
 		return
 	}
 
-
 	// Interstitial Warning Page to prevent automated phishing scanners from flagging the domain.
 	if strings.Contains(c.GetHeader("Accept"), "text/html") {
 		if _, err := c.Cookie("portshare_interstitial_accepted"); err != nil {
@@ -545,7 +654,7 @@ func HandlePublicTunnel(c *gin.Context) {
 				c.Redirect(http.StatusFound, c.Request.URL.String())
 				return
 			}
-			
+
 			c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(`
 <!DOCTYPE html>
 <html lang="en">
@@ -746,13 +855,17 @@ func HandlePublicTunnel(c *gin.Context) {
 		tunnelStore.Unlock()
 	}()
 
-	request := tunnelRequest{ID: requestID, Method: c.Request.Method, Path: c.Request.URL.RequestURI(), Headers: c.Request.Header, Body: base64.StdEncoding.EncodeToString(body)}
-	writeErr := connection.writeJSON(request)
+	request := &tunnelRequest{ID: requestID, Method: c.Request.Method, Path: c.Request.URL.RequestURI(), Headers: c.Request.Header, Body: body}
+	writeErr := connection.writeRequest(request)
 	if writeErr != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"message": "desktop tunnel connection failed"})
 		return
 	}
 	bytesIn := requestTransferBytes(c, body)
+	// NewTimer (not time.After): the timer is stopped on early response so
+	// idle timers don't pile up under high request rates.
+	timer := time.NewTimer(60 * time.Second)
+	defer timer.Stop()
 	select {
 	case response := <-responseChannel:
 		if response.Error != "" {
@@ -769,22 +882,16 @@ func HandlePublicTunnel(c *gin.Context) {
 				c.Writer.Header().Add(name, value)
 			}
 		}
-		decoded, decodeErr := base64.StdEncoding.DecodeString(response.Body)
-		if decodeErr != nil {
-			recordRequestStats(clientID, http.StatusBadGateway, bytesIn, 0)
-			c.JSON(http.StatusBadGateway, gin.H{"message": "invalid tunnel response"})
-			return
-		}
 		status := response.Status
 		if status < 100 {
 			status = http.StatusBadGateway
 		}
-		recordRequestStats(clientID, status, bytesIn, responseTransferBytes(status, response.Headers, decoded))
+		recordRequestStats(clientID, status, bytesIn, responseTransferBytes(status, response.Headers, response.Body))
 		c.Status(status)
-		if _, writeErr := c.Writer.Write(decoded); writeErr != nil {
+		if _, writeErr := c.Writer.Write(response.Body); writeErr != nil {
 			return
 		}
-	case <-time.After(60 * time.Second):
+	case <-timer.C:
 		recordRequestStats(clientID, http.StatusGatewayTimeout, bytesIn, 0)
 		c.JSON(http.StatusGatewayTimeout, gin.H{"message": "desktop tunnel response timed out"})
 	}
@@ -794,9 +901,10 @@ func clientForHost(rawHost string) string {
 	host := strings.ToLower(strings.Split(rawHost, ":")[0])
 	clientStore.RLock()
 	defer clientStore.RUnlock()
-	for clientID, client := range clientStore.clients {
-		if client.CustomDomain == host {
-			return clientID
+	// Custom domains: exact lookup in the maintained index (O(1)).
+	if id, ok := clientStore.domains[host]; ok {
+		if _, ok := clientStore.clients[id]; ok {
+			return id
 		}
 	}
 	rootDomain := strings.ToLower(os.Getenv("PORTSHARE_ROOT_DOMAIN"))
@@ -807,7 +915,9 @@ func clientForHost(rawHost string) string {
 	if strings.HasSuffix(host, suffix) {
 		name := strings.TrimSuffix(host, suffix)
 		if owner, found := clientStore.subdomains[name]; found {
-			return owner
+			if _, ok := clientStore.clients[owner]; ok {
+				return owner
+			}
 		}
 	}
 	return ""
