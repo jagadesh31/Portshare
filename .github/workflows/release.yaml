@@ -74,8 +74,11 @@ jobs:
               desktop/electron/out/make/squirrel.windows/**/*
           - os: windows-latest
             arch: arm64
+            # Squirrel's Setup.exe/RELEASES/nupkg names do not include the
+            # architecture, so uploading them from both Windows jobs makes
+            # them overwrite each other. Windows arm64 ships a portable zip;
+            # Windows x64 owns the Squirrel installer.
             files: |
-              desktop/electron/out/make/squirrel.windows/**/*
               desktop/electron/out/make/zip/**/*
           - os: macos-latest
             arch: x64
